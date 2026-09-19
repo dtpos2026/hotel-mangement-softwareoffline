@@ -142,8 +142,8 @@ export function defaultSettings() {
       id: 'printer',
       // 80mm thermal defaults tuned for a standard 80mm/72mm-printable head.
       widthMm: 80,
-      marginLeftMm: 3,
-      marginRightMm: 3,
+      marginLeftMm: 4,
+      marginRightMm: 4,
       marginTopMm: 3,
       marginBottomMm: 6,
       fontSizePt: 11,
