@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #F4F6F5; }
+  body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #16202A; -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+  a { color: #3C096C; text-decoration: none; }
+  a:hover { color: #5B1A9C; }
+  input, select, textarea, button { font-family: inherit; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid #B47B2B; outline-offset: 1px; }
+  ::selection { background: #B47B2B33; }
+  /* Keep ledger figures, dates and times in logical LTR order even when the UI is RTL */
+  [style*="IBM Plex Mono"] { direction: ltr; unicode-bidi: isolate; }
+  [dir="rtl"] [style*="text-align:end"] { text-align: left; }
+</style>
+</helmet>
+
+<div dir="{{ dir }}" style="min-height:100vh;display:grid;grid-template-columns:232px 1fr;background:#F4F6F5">
+
+  <aside style="background:#1A0730;color:#B6A8C6;display:flex;flex-direction:column;min-height:100vh;position:sticky;top:0;height:100vh">
+    <div style="padding:18px 18px 14px 18px;border-bottom:1px solid #2E1247">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:30px;height:30px;border-radius:6px;background:#3C096C;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#F2EBF8">HR</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:#F4F6F5;letter-spacing:0.01em">Hotel Register</div>
+          <div style="font-size:11px;color:#8A79A0;font-family:'IBM Plex Mono',monospace">v1.0 · offline</div>
+        </div>
+      </div>
+    </div>
+
+    <nav style="padding:10px 0;display:flex;flex-direction:column;gap:1px;overflow-y:auto;flex:1">
+      <sc-for list="{{ nav }}" as="item" hint-placeholder-count="12">
+        <button type="button" onClick="{{ item.onSelect }}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:start;border:0;cursor:pointer;padding:9px 16px 9px 13px;font-size:14px;font-weight:500;border-left:3px solid {{ item.bar }};background:{{ item.bg }};color:{{ item.fg }}">
+          <span>{{ item.label }}</span>
+          <span style="font-family:'Noto Nastaliq Urdu',serif;font-size:11px;line-height:1.9;opacity:0.55">{{ item.labelUr }}</span>
+        </button>
+      </sc-for>
+    </nav>
+
+    <div style="padding:12px 16px;border-top:1px solid #2E1247;font-size:11px;font-family:'IBM Plex Mono',monospace;color:#8A79A0;display:flex;flex-direction:column;gap:4px">
+      <span>F2 check in · F4 check out</span>
+      <span>F8 print bill · ⌘K search</span>
+    </div>
+
+    <div style="padding:14px 16px;border-top:1px solid #2E1247;background:#150527;display:flex;align-items:center;gap:10px">
+      <img src="uploads/688805644_925825200277402_2853370428068464345_n.jpg" alt="Digital Target" width="32" height="32" style="width:32px;height:32px;border-radius:6px;object-fit:cover;flex:0 0 auto" />
+      <div style="min-width:0">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#8A79A0;font-weight:600">Software by</div>
+        <div style="font-size:13px;font-weight:700;color:#F2EBF8;letter-spacing:0.01em">Digital Target</div>
+      </div>
+    </div>
+  </aside>
+
+  <main style="min-width:0;display:flex;flex-direction:column">
+
+    <header style="background:#FFFFFF;border-bottom:1px solid #E2E6E4;padding:12px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:5">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <div style="width:32px;height:32px;border-radius:6px;background:#3C096C;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:#F2EBF8">KC</div>
+        <div style="min-width:0">
+          <div style="font-size:14px;font-weight:600;white-space:nowrap">{{ hotelName }}</div>
+          <div style="font-size:12px;color:#6B7280;font-family:'IBM Plex Mono',monospace">05 Aug 2026 · Tue</div>
+        </div>
+      </div>
+
+      <div style="flex:1;display:flex;justify-content:center">
+        <div style="display:flex;align-items:center;gap:8px;width:100%;max-width:340px;border:1px solid #E2E6E4;border-radius:8px;padding:7px 10px;background:#F9FAFA">
+          <span style="font-size:13px;color:#9AA5AC">Search guest, room, CNIC</span>
+          <span style="margin-inline-start:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9AA5AC;border:1px solid #E2E6E4;border-radius:4px;padding:1px 5px;background:#FFFFFF">⌘K</span>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#1F3A2E;background:#EAF0EC;border:1px solid #D3E0D7;border-radius:999px;padding:5px 10px;white-space:nowrap">
+          <span style="width:6px;height:6px;border-radius:99px;background:#4B7F52"></span>Offline mode — saved on this device
+        </span>
+        <button type="button" onClick="{{ toggleLang }}" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;color:#16202A">{{ langLabel }}</button>
+        <div style="display:flex;align-items:center;gap:8px;border-inline-start:1px solid #E2E6E4;padding-inline-start:12px">
+          <div style="width:28px;height:28px;border-radius:99px;background:#3C096C;color:#F2EBF8;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">IK</div>
+          <div style="line-height:1.25">
+            <div style="font-size:13px;font-weight:600">Imran K.</div>
+            <div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Reception</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div style="padding:20px 24px 40px 24px;display:flex;flex-direction:column;gap:18px">
+
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div>
+          <h1 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.01em">{{ pageTitle }}</h1>
+          <div style="margin-top:3px;font-family:'Noto Nastaliq Urdu',serif;font-size:14px;line-height:2;color:#6B7280">{{ pageTitleUr }}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" onClick="{{ goCheckIn }}" style="border:0;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;color:#FFFFFF;cursor:pointer;background:{{ accent }}">Check in guest</button>
+          <button type="button" onClick="{{ goRegister }}" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;color:#16202A">Print register</button>
+        </div>
+      </div>
+
+      <!-- ── DASHBOARD ───────────────────────────────── -->
+      <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:18px">
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="6">
+              <div style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;padding:14px">
+                <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600">{{ k.label }}</div>
+                <div style="margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ k.color }}">{{ k.value }}</div>
+                <div style="margin-top:6px;font-size:12px;color:#6B7280;font-family:'IBM Plex Mono',monospace">{{ k.sub }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;align-items:start">
+
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px">
+              <div style="padding:12px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:baseline;gap:8px">
+                <h2 style="margin:0;font-size:16px;font-weight:600">Arrivals today</h2>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6B7280">2 expected</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ arrivals }}" as="a" hint-placeholder-count="2">
+                  <div style="padding:12px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:center;gap:12px">
+                    <div style="min-width:0;flex:1">
+                      <div style="font-size:14px;font-weight:600">{{ a.name }}</div>
+                      <div style="margin-top:3px;font-size:12px;color:#6B7280;font-family:'IBM Plex Mono',monospace">{{ a.meta }}</div>
+                    </div>
+                    <button type="button" onClick="{{ goCheckIn }}" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;color:#16202A;white-space:nowrap">Check in</button>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px">
+              <div style="padding:12px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:baseline;gap:8px">
+                <h2 style="margin:0;font-size:16px;font-weight:600">Departures today</h2>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6B7280">3 due out</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ departures }}" as="d" hint-placeholder-count="3">
+                  <div style="padding:12px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:center;gap:12px">
+                    <div style="min-width:0;flex:1">
+                      <div style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px">
+                        <span>{{ d.name }}</span>
+                        <sc-if value="{{ d.overdue }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#B3261E;border:1px solid #F0CFCC;background:#FBEDEC;border-radius:4px;padding:1px 5px">Overdue</span>
+                        </sc-if>
+                      </div>
+                      <div style="margin-top:3px;font-size:12px;color:#6B7280;font-family:'IBM Plex Mono',monospace">{{ d.meta }}</div>
+                    </div>
+                    <div style="text-align:end">
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ d.balColor }}">{{ d.balance }}</div>
+                      <button type="button" onClick="{{ goCheckOut }}" style="margin-top:5px;border:1px solid #E2E6E4;background:#FFFFFF;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:600;cursor:pointer;color:#16202A">Check out</button>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px">
+              <div style="padding:12px 14px;border-bottom:1px solid #E2E6E4">
+                <h2 style="margin:0;font-size:16px;font-weight:600">Room status</h2>
+              </div>
+              <div style="padding:14px">
+                <div style="display:flex;height:10px;border-radius:99px;overflow:hidden;border:1px solid #E2E6E4">
+                  <sc-for list="{{ statusStrip }}" as="s" hint-placeholder-count="4">
+                    <div style="height:100%;flex:{{ s.count }};background:{{ s.color }}"></div>
+                  </sc-for>
+                </div>
+                <div style="margin-top:14px;display:flex;flex-direction:column;gap:1px">
+                  <sc-for list="{{ statusStrip }}" as="s" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ goRooms }}" style="display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;cursor:pointer;padding:7px 2px;text-align:start;border-bottom:1px solid #F0F2F1">
+                      <span style="width:8px;height:8px;border-radius:2px;background:{{ s.color }}"></span>
+                      <span style="font-size:13px;flex:1;color:#16202A">{{ s.label }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-variant-numeric:tabular-nums;color:#16202A">{{ s.count }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:start">
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;overflow:hidden">
+              <div style="padding:12px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:baseline;gap:8px">
+                <h2 style="margin:0;font-size:16px;font-weight:600">Recent register entries</h2>
+                <span style="font-family:'Noto Nastaliq Urdu',serif;font-size:13px;line-height:2;color:#6B7280">روزنامچہ</span>
+              </div>
+              <div style="overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse">
+                  <thead>
+                    <tr>
+                      <th style="text-align:start;padding:8px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4;white-space:nowrap">S.No</th>
+                      <th style="text-align:start;padding:8px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4;white-space:nowrap">Time</th>
+                      <th style="text-align:start;padding:8px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4;white-space:nowrap">Guest</th>
+                      <th style="text-align:start;padding:8px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4;white-space:nowrap">Room</th>
+                      <th style="text-align:start;padding:8px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4;white-space:nowrap">Movement</th>
+                      <th style="text-align:end;padding:8px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4;white-space:nowrap">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{ recent }}" as="r" hint-placeholder-count="6">
+                      <tr>
+                        <td style="padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-variant-numeric:tabular-nums;border-bottom:1px solid #E2E6E4;color:#6B7280">{{ r.sno }}</td>
+                        <td style="padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4">{{ r.time }}</td>
+                        <td style="padding:9px 12px;font-size:13px;border-bottom:1px solid #E2E6E4">{{ r.guest }}</td>
+                        <td style="padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4">{{ r.room }}</td>
+                        <td style="padding:9px 12px;font-size:13px;border-bottom:1px solid #E2E6E4">
+                          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;border-radius:4px;padding:2px 6px;color:{{ r.mvColor }};background:{{ r.mvBg }}">{{ r.movement }}</span>
+                        </td>
+                        <td style="padding:9px 12px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;font-variant-numeric:tabular-nums;border-bottom:1px solid #E2E6E4">{{ r.amount }}</td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px">
+              <div style="padding:12px 14px;border-bottom:1px solid #E2E6E4">
+                <h2 style="margin:0;font-size:16px;font-weight:600">Quick actions</h2>
+              </div>
+              <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ quickActions }}" as="q" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ q.onSelect }}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #E2E6E4;background:#FFFFFF;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:600;cursor:pointer;color:#16202A;text-align:start">
+                    <span>{{ q.label }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9AA5AC">{{ q.key }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ── ROOMS ───────────────────────────────────── -->
+      <sc-if value="{{ isRooms }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:1fr 300px;gap:12px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <span style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600">Filter</span>
+              <select style="border:1px solid #E2E6E4;border-radius:6px;padding:6px 8px;font-size:13px;background:#FFFFFF"><option>All floors</option><option>Ground</option><option>First</option><option>Second</option></select>
+              <select style="border:1px solid #E2E6E4;border-radius:6px;padding:6px 8px;font-size:13px;background:#FFFFFF"><option>All types</option><option>Standard Double</option><option>Deluxe Double</option><option>Family Suite</option><option>Master Suite</option></select>
+              <select style="border:1px solid #E2E6E4;border-radius:6px;padding:6px 8px;font-size:13px;background:#FFFFFF"><option>All statuses</option><option>Vacant</option><option>Occupied</option><option>Dirty</option><option>Blocked</option></select>
+              <div style="margin-inline-start:auto;display:flex;border:1px solid #E2E6E4;border-radius:6px;overflow:hidden">
+                <span style="padding:6px 10px;font-size:12px;font-weight:600;background:#F4F6F5">Board</span>
+                <span style="padding:6px 10px;font-size:12px;font-weight:600;color:#6B7280;border-inline-start:1px solid #E2E6E4">List</span>
+              </div>
+            </div>
+
+            <sc-for list="{{ floors }}" as="floor" hint-placeholder-count="3">
+              <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px">
+                <div style="padding:10px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:baseline;gap:8px">
+                  <h2 style="margin:0;font-size:16px;font-weight:600">{{ floor.name }}</h2>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6B7280">{{ floor.summary }}</span>
+                </div>
+                <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px">
+                  <sc-for list="{{ floor.rooms }}" as="room" hint-placeholder-count="6">
+                    <button type="button" onClick="{{ room.onSelect }}" style="text-align:start;border:1px solid #E2E6E4;border-radius:8px;padding:0;overflow:hidden;background:#FFFFFF;cursor:pointer">
+                      <div style="height:4px;background:{{ room.color }}"></div>
+                      <div style="padding:10px 12px 12px 12px">
+                        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px">
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums">{{ room.number }}</span>
+                          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:{{ room.color }}">{{ room.status }}</span>
+                        </div>
+                        <div style="margin-top:4px;font-size:12px;color:#6B7280">{{ room.type }}</div>
+                        <div style="margin-top:8px;font-size:13px;font-weight:600;min-height:18px">{{ room.guest }}</div>
+                        <div style="margin-top:2px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ room.balColor }};min-height:16px">{{ room.detail }}</div>
+                      </div>
+                    </button>
+                  </sc-for>
+                </div>
+              </section>
+            </sc-for>
+          </div>
+
+          <aside style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;position:sticky;top:88px">
+            <div style="padding:12px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+              <h2 style="margin:0;font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600">Room {{ sel.number }}</h2>
+              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:{{ sel.color }}">{{ sel.status }}</span>
+            </div>
+            <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ sel.rows }}" as="row" hint-placeholder-count="6">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-bottom:1px solid #F0F2F1;padding-bottom:7px">
+                  <span style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600">{{ row.k }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-variant-numeric:tabular-nums;text-align:end">{{ row.v }}</span>
+                </div>
+              </sc-for>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+                <button type="button" onClick="{{ goCheckOut }}" style="border:0;border-radius:8px;padding:9px 10px;font-size:13px;font-weight:600;color:#FFFFFF;cursor:pointer;background:{{ accent }}">Check out</button>
+                <button type="button" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:8px;padding:9px 10px;font-size:13px;font-weight:600;cursor:pointer;color:#16202A">Mark clean</button>
+                <button type="button" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:8px;padding:9px 10px;font-size:13px;font-weight:600;cursor:pointer;color:#16202A">Change room</button>
+                <button type="button" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:8px;padding:9px 10px;font-size:13px;font-weight:600;cursor:pointer;color:#16202A">Block room</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </sc-if>
+
+      <!-- ── CHECK IN ────────────────────────────────── -->
+      <sc-if value="{{ isCheckIn }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:1fr 320px;gap:12px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:12px">
+
+            <div style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+              <div>
+                <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600">Register serial</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">2026-0088</div>
+              </div>
+              <div style="width:1px;height:34px;background:#E2E6E4"></div>
+              <div style="flex:1;min-width:220px">
+                <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Search existing guest</label>
+                <input placeholder="CNIC or phone number" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+              </div>
+            </div>
+
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px">
+              <div style="padding:11px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:baseline;gap:8px">
+                <h2 style="margin:0;font-size:16px;font-weight:600">A · Guest details</h2>
+                <span style="font-family:'Noto Nastaliq Urdu',serif;font-size:13px;line-height:2;color:#6B7280">مہمان کی تفصیل</span>
+              </div>
+              <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Full name</label>
+                  <input placeholder="Muhammad Bilal" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px" />
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">نام (Urdu, optional)</label>
+                  <input dir="rtl" placeholder="محمد بلال" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:14px;font-family:'Noto Nastaliq Urdu',serif;line-height:2" />
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">CNIC / Passport</label>
+                  <input placeholder="15302-1234567-1" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                  <div style="margin-top:4px;font-size:12px;color:#C98A16">Can be recorded later — check-in will still save.</div>
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Phone</label>
+                  <input placeholder="0300-1234567" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Address</label>
+                  <input placeholder="House 4, Street 11, Gulberg" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px" />
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">City</label>
+                  <input placeholder="Lahore" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px" />
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Coming from</label>
+                  <input placeholder="Islamabad" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px" />
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Going to</label>
+                  <input placeholder="Kalam" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px" />
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Purpose</label>
+                  <select style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;background:#FFFFFF"><option>Tourism</option><option>Business</option><option>Family</option><option>Other</option></select>
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Vehicle number</label>
+                  <input placeholder="LEB-1234" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">ID photo</label>
+                  <div style="margin-top:5px;display:flex;gap:8px">
+                    <button type="button" style="flex:1;border:1px dashed #C9D2CD;background:#F9FAFA;border-radius:6px;padding:8px 10px;font-size:12px;font-weight:600;cursor:pointer;color:#6B7280">Capture</button>
+                    <button type="button" style="flex:1;border:1px dashed #C9D2CD;background:#F9FAFA;border-radius:6px;padding:8px 10px;font-size:12px;font-weight:600;cursor:pointer;color:#6B7280">Upload</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px">
+              <div style="padding:11px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:baseline;gap:8px">
+                <h2 style="margin:0;font-size:16px;font-weight:600">B · Accompanying persons</h2>
+                <span style="font-family:'Noto Nastaliq Urdu',serif;font-size:13px;line-height:2;color:#6B7280">ہمراہی افراد</span>
+              </div>
+              <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ companions }}" as="c" hint-placeholder-count="2">
+                  <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.6fr 34px;gap:8px;align-items:center">
+                    <input value="{{ c.name }}" placeholder="Name" style="border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px" />
+                    <input value="{{ c.relation }}" placeholder="Relation" style="border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px" />
+                    <input value="{{ c.age }}" placeholder="Age" style="border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                    <input value="{{ c.cnic }}" placeholder="CNIC (optional)" style="border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                    <button type="button" onClick="{{ c.onRemove }}" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:6px;padding:8px 0;font-size:14px;cursor:pointer;color:#B3261E">×</button>
+                  </div>
+                </sc-for>
+                <button type="button" onClick="{{ addCompanion }}" style="align-self:flex-start;border:1px solid #E2E6E4;background:#FFFFFF;border-radius:6px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;color:#16202A">Add person</button>
+              </div>
+            </section>
+
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px">
+              <div style="padding:11px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:baseline;gap:8px">
+                <h2 style="margin:0;font-size:16px;font-weight:600">C · Stay details</h2>
+                <span style="font-family:'Noto Nastaliq Urdu',serif;font-size:13px;line-height:2;color:#6B7280">قیام کی تفصیل</span>
+              </div>
+              <div style="padding:14px;display:flex;flex-direction:column;gap:14px">
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Rooms — vacant only</label>
+                  <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+                    <sc-for list="{{ vacantRooms }}" as="v" hint-placeholder-count="8">
+                      <button type="button" onClick="{{ v.onToggle }}" style="border:1px solid {{ v.border }};background:{{ v.bg }};color:{{ v.fg }};border-radius:6px;padding:8px 11px;cursor:pointer;text-align:start;min-width:96px">
+                        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600">{{ v.number }}</div>
+                        <div style="font-size:11px;opacity:0.75">{{ v.type }}</div>
+                      </button>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+                  <div>
+                    <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Adults</label>
+                    <input value="{{ adults }}" onInput="{{ onAdults }}" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Children</label>
+                    <input value="{{ children }}" onInput="{{ onChildren }}" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Check-in</label>
+                    <input value="05 Aug 2026  02:40 PM" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Expected check-out</label>
+                    <input value="{{ expectedOut }}" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Nights</label>
+                    <input value="{{ nights }}" onInput="{{ onNights }}" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Rate per night</label>
+                    <input value="{{ rate }}" onInput="{{ onRate }}" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                    <div style="margin-top:4px;font-size:12px;color:#2C6E8F">Peak June–Aug rate applied</div>
+                  </div>
+                  <div>
+                    <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Discount</label>
+                    <input value="{{ discount }}" onInput="{{ onDiscount }}" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Advance received</label>
+                    <input value="{{ advance }}" onInput="{{ onAdvance }}" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Payment method</label>
+                    <select style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;background:#FFFFFF"><option>Cash</option><option>Easypaisa</option><option>JazzCash</option><option>Bank transfer</option><option>Card</option></select>
+                  </div>
+                  <div>
+                    <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Booking source</label>
+                    <select style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;background:#FFFFFF"><option>Walk-in</option><option>Phone</option><option>WhatsApp</option><option>Agent</option><option>Tour group</option></select>
+                  </div>
+                </div>
+
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Remarks</label>
+                  <textarea rows="2" placeholder="Heater needed, arriving late" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;resize:vertical"></textarea>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <aside style="position:sticky;top:88px;display:flex;flex-direction:column;gap:12px">
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px">
+              <div style="padding:11px 14px;border-bottom:1px solid #E2E6E4">
+                <h2 style="margin:0;font-size:16px;font-weight:600">Bill summary</h2>
+              </div>
+              <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ billLines }}" as="b" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding-bottom:7px;border-bottom:1px solid #F0F2F1">
+                    <span style="font-size:13px;color:{{ b.color }};font-weight:{{ b.weight }}">{{ b.label }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-variant-numeric:tabular-nums;color:{{ b.color }};font-weight:{{ b.weight }}">{{ b.value }}</span>
+                  </div>
+                </sc-for>
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:2px;padding-top:8px;border-top:1px solid #E2E6E4">
+                  <span style="font-size:14px;font-weight:700">Balance</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:{{ balanceColor }}">{{ balance }}</span>
+                </div>
+              </div>
+            </section>
+
+            <button type="button" style="border:0;border-radius:8px;padding:12px 14px;font-size:14px;font-weight:700;color:#FFFFFF;cursor:pointer;background:{{ accent }}">Check in guest</button>
+            <button type="button" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:600;cursor:pointer;color:#16202A">Save draft</button>
+            <p style="margin:0;font-size:12px;color:#6B7280;line-height:1.5">On save: guest recorded, serial 2026-0088 issued, rooms marked occupied, advance receipted. You can then print the advance receipt or registration card.</p>
+          </aside>
+        </div>
+      </sc-if>
+
+      <!-- ── IN HOUSE ────────────────────────────────── -->
+      <sc-if value="{{ isInHouse }}" hint-placeholder-val="{{ false }}">
+        <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;overflow:hidden">
+          <div style="padding:12px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <h2 style="margin:0;font-size:16px;font-weight:600">4 stays in house</h2>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#B3261E">Rs 24,150 outstanding</span>
+            <input placeholder="Search name, room, CNIC" style="margin-inline-start:auto;border:1px solid #E2E6E4;border-radius:6px;padding:7px 10px;font-size:13px;min-width:220px" />
+          </div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;min-width:940px">
+              <thead>
+                <tr>
+                  <sc-for list="{{ inHouseCols }}" as="c" hint-placeholder-count="11">
+                    <th style="text-align:{{ c.align }};padding:9px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4;white-space:nowrap;background:#FAFBFB;position:sticky;top:0">{{ c.label }}</th>
+                  </sc-for>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ inHouse }}" as="s" hint-placeholder-count="4">
+                  <tr>
+                    <td style="padding:11px 12px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4;color:#6B7280">{{ s.sno }}</td>
+                    <td style="padding:11px 12px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;border-bottom:1px solid #E2E6E4">{{ s.room }}</td>
+                    <td style="padding:11px 12px;font-size:13px;font-weight:600;border-bottom:1px solid #E2E6E4">{{ s.guest }}</td>
+                    <td style="padding:11px 12px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4">{{ s.phone }}</td>
+                    <td style="padding:11px 12px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4">{{ s.in }}</td>
+                    <td style="padding:11px 12px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4">{{ s.out }}</td>
+                    <td style="padding:11px 12px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4">{{ s.nights }}</td>
+                    <td style="padding:11px 12px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;font-variant-numeric:tabular-nums;border-bottom:1px solid #E2E6E4">{{ s.charges }}</td>
+                    <td style="padding:11px 12px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;font-variant-numeric:tabular-nums;border-bottom:1px solid #E2E6E4">{{ s.paid }}</td>
+                    <td style="padding:11px 12px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;border-bottom:1px solid #E2E6E4;color:{{ s.balColor }}">{{ s.balance }}</td>
+                    <td style="padding:11px 12px;border-bottom:1px solid #E2E6E4">
+                      <div style="display:flex;gap:6px;justify-content:flex-end">
+                        <button type="button" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:600;cursor:pointer;color:#16202A">Add charge</button>
+                        <button type="button" onClick="{{ goCheckOut }}" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:600;cursor:pointer;color:#16202A">Check out</button>
+                      </div>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </sc-if>
+
+      <!-- ── CHECK OUT ───────────────────────────────── -->
+      <sc-if value="{{ isCheckOut }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:start">
+          <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;overflow:hidden">
+            <div style="padding:12px 14px;border-bottom:1px solid #E2E6E4;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <div>
+                <div style="font-size:16px;font-weight:600">Muhammad Bilal</div>
+                <div style="margin-top:2px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6B7280">S.No 2026-0087 · Room 204 · 15302-1234567-1</div>
+              </div>
+              <span style="margin-inline-start:auto;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#B3261E;background:#FBEDEC;border:1px solid #F0CFCC;border-radius:999px;padding:5px 11px">Balance Rs 12,050</span>
+            </div>
+            <table style="width:100%;border-collapse:collapse">
+              <thead>
+                <tr>
+                  <th style="text-align:start;padding:9px 14px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4">Description</th>
+                  <th style="text-align:end;padding:9px 14px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4">Qty</th>
+                  <th style="text-align:end;padding:9px 14px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4">Rate</th>
+                  <th style="text-align:end;padding:9px 14px;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;border-bottom:1px solid #E2E6E4">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ folio }}" as="f" hint-placeholder-count="6">
+                  <tr>
+                    <td style="padding:10px 14px;font-size:13px;border-bottom:1px solid #E2E6E4">
+                      <span style="font-weight:{{ f.weight }}">{{ f.desc }}</span>
+                      <span style="margin-inline-start:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280">{{ f.group }}</span>
+                    </td>
+                    <td style="padding:10px 14px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4">{{ f.qty }}</td>
+                    <td style="padding:10px 14px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4">{{ f.rate }}</td>
+                    <td style="padding:10px 14px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;font-variant-numeric:tabular-nums;border-bottom:1px solid #E2E6E4">{{ f.amount }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div style="padding:14px;display:flex;flex-direction:column;gap:8px;background:#FAFBFB;border-top:1px solid #E2E6E4">
+              <sc-for list="{{ folioTotals }}" as="t" hint-placeholder-count="6">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                  <span style="font-size:13px;font-weight:{{ t.weight }};color:{{ t.color }}">{{ t.label }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:{{ t.size }};font-weight:{{ t.weight }};font-variant-numeric:tabular-nums;color:{{ t.color }}">{{ t.value }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+
+          <aside style="position:sticky;top:88px;display:flex;flex-direction:column;gap:12px">
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px">
+              <div style="padding:11px 14px;border-bottom:1px solid #E2E6E4">
+                <h2 style="margin:0;font-size:16px;font-weight:600">Settlement</h2>
+              </div>
+              <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Amount received</label>
+                  <input value="12,050" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:9px 10px;font-size:16px;font-family:'IBM Plex Mono',monospace;font-weight:600" />
+                  <button type="button" style="margin-top:6px;border:1px solid #E2E6E4;background:#FFFFFF;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;color:#16202A">Settle full balance</button>
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Method</label>
+                  <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+                    <sc-for list="{{ methods }}" as="m" hint-placeholder-count="5">
+                      <button type="button" onClick="{{ m.onSelect }}" style="border:1px solid {{ m.border }};background:{{ m.bg }};color:{{ m.fg }};border-radius:6px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer">{{ m.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Reference</label>
+                  <input placeholder="TRX / slip no" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace" />
+                </div>
+                <div>
+                  <label style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600;display:block">Note</label>
+                  <textarea rows="2" style="margin-top:5px;width:100%;border:1px solid #E2E6E4;border-radius:6px;padding:8px 10px;font-size:13px;resize:vertical"></textarea>
+                </div>
+                <button type="button" style="border:0;border-radius:8px;padding:12px 14px;font-size:14px;font-weight:700;color:#FFFFFF;cursor:pointer;background:{{ accent }}">Take payment and clear account</button>
+                <p style="margin:0;font-size:12px;color:#6B7280;line-height:1.5">Account cannot be cleared while a balance remains. A manager may approve a written-off amount with a reason — the approval is audited.</p>
+              </div>
+            </section>
+            <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600">After clearance</div>
+              <button type="button" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;color:#16202A;text-align:start">Print guest bill (80mm)</button>
+              <button type="button" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;color:#16202A;text-align:start">Print clearance slip</button>
+            </section>
+          </aside>
+        </div>
+      </sc-if>
+
+      <!-- ── REGISTER ────────────────────────────────── -->
+      <sc-if value="{{ isRegister }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <div style="display:flex;border:1px solid #E2E6E4;border-radius:6px;overflow:hidden">
+              <sc-for list="{{ regTabs }}" as="t" hint-placeholder-count="5">
+                <button type="button" onClick="{{ t.onSelect }}" style="border:0;border-inline-end:1px solid #E2E6E4;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+              </sc-for>
+            </div>
+            <select style="border:1px solid #E2E6E4;border-radius:6px;padding:6px 8px;font-size:13px;background:#FFFFFF"><option>Today</option><option>Yesterday</option><option>This month</option><option>Custom range</option></select>
+            <input placeholder="Name / CNIC / phone / vehicle" style="border:1px solid #E2E6E4;border-radius:6px;padding:7px 10px;font-size:13px;min-width:230px" />
+            <div style="margin-inline-start:auto;display:flex;gap:8px">
+              <button type="button" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:6px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;color:#16202A">Police / guest report</button>
+              <button type="button" style="border:1px solid #E2E6E4;background:#FFFFFF;border-radius:6px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;color:#16202A">Export CSV</button>
+              <button type="button" style="border:0;border-radius:6px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;color:#FFFFFF;background:{{ accent }}">Print register (A4)</button>
+            </div>
+          </div>
+
+          <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;overflow:hidden">
+            <div style="padding:12px 16px;border-bottom:2px solid #16202A;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap">
+              <div>
+                <div style="font-size:16px;font-weight:600;letter-spacing:0.02em">KALAM CONTINENTAL — GUEST REGISTER</div>
+                <div style="margin-top:2px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6B7280">Main Bazar, Kalam, Swat · 01 Aug 2026 – 05 Aug 2026</div>
+              </div>
+              <div style="font-family:'Noto Nastaliq Urdu',serif;font-size:18px;line-height:2;color:#1F3A2E">روزنامچہ</div>
+            </div>
+            <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;min-width:1500px">
+                <thead>
+                  <tr>
+                    <sc-for list="{{ regCols }}" as="c" hint-placeholder-count="16">
+                      <th style="text-align:{{ c.align }};padding:9px 10px;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:#16202A;font-weight:700;border-bottom:1px solid #16202A;border-inline-end:1px solid #E2E6E4;white-space:nowrap;background:#F4F6F5;position:sticky;top:0">{{ c.label }}</th>
+                    </sc-for>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{ regRows }}" as="r" hint-placeholder-count="8">
+                    <tr>
+                      <td style="padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;color:#6B7280">{{ r.sno }}</td>
+                      <td style="padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;white-space:nowrap">{{ r.date }}</td>
+                      <td style="padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;white-space:nowrap">{{ r.time }}</td>
+                      <td style="padding:9px 10px;font-size:13px;font-weight:600;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;white-space:nowrap">{{ r.guest }}</td>
+                      <td style="padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;white-space:nowrap">{{ r.cnic }}</td>
+                      <td style="padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1">{{ r.room }}</td>
+                      <td style="padding:9px 10px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1">{{ r.persons }}</td>
+                      <td style="padding:9px 10px;font-size:13px;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;white-space:nowrap">{{ r.from }}</td>
+                      <td style="padding:9px 10px;font-size:13px;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;white-space:nowrap">{{ r.to }}</td>
+                      <td style="padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;white-space:nowrap">{{ r.vehicle }}</td>
+                      <td style="padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;white-space:nowrap">{{ r.inAt }}</td>
+                      <td style="padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;white-space:nowrap;color:#6B7280">{{ r.outAt }}</td>
+                      <td style="padding:9px 10px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;font-variant-numeric:tabular-nums;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1">{{ r.charges }}</td>
+                      <td style="padding:9px 10px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;font-variant-numeric:tabular-nums;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1">{{ r.paid }}</td>
+                      <td style="padding:9px 10px;text-align:end;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;border-bottom:1px solid #E2E6E4;border-inline-end:1px solid #F0F2F1;color:{{ r.balColor }}">{{ r.balance }}</td>
+                      <td style="padding:9px 10px;font-size:13px;border-bottom:1px solid #E2E6E4">
+                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;border-radius:4px;padding:2px 6px;color:{{ r.clColor }};background:{{ r.clBg }}">{{ r.cleared }}</span>
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+            <div style="padding:12px 16px;border-top:2px solid #16202A;background:#FAFBFB;display:flex;gap:26px;flex-wrap:wrap">
+              <sc-for list="{{ regTotals }}" as="t" hint-placeholder-count="4">
+                <div>
+                  <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6B7280;font-weight:600">{{ t.label }}</div>
+                  <div style="margin-top:3px;font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:{{ t.color }}">{{ t.value }}</div>
+                </div>
+              </sc-for>
+              <div style="margin-inline-start:auto;align-self:flex-end;border-top:1px solid #16202A;padding-top:5px;min-width:190px;text-align:center;font-size:12px;color:#6B7280">Signature — Manager on duty</div>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- ── PLACEHOLDER SCREENS ─────────────────────── -->
+      <sc-if value="{{ isPlaceholder }}" hint-placeholder-val="{{ false }}">
+        <section style="background:#FFFFFF;border:1px solid #E2E6E4;border-radius:8px;padding:28px 24px;display:flex;flex-direction:column;gap:14px;max-width:620px">
+          <div style="font-size:16px;font-weight:600">Not built in this pass</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#4A5A66">{{ placeholderNote }}</p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ placeholderItems }}" as="p" hint-placeholder-count="4">
+              <div style="display:flex;gap:9px;align-items:baseline;font-size:13px;color:#16202A">
+                <span style="width:5px;height:5px;border-radius:2px;background:#B47B2B;flex:0 0 auto;transform:translateY(-2px)"></span>
+                <span>{{ p }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <button type="button" onClick="{{ goDash }}" style="align-self:flex-start;border:1px solid #E2E6E4;background:#FFFFFF;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;color:#16202A">Back to dashboard</button>
+        </section>
+      </sc-if>
+
+    </div>
+
+    <footer style="margin-top:auto;border-top:1px solid #E2E6E4;background:#FFFFFF;padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <img src="uploads/688805644_925825200277402_2853370428068464345_n.jpg" alt="Digital Target" width="34" height="34" style="width:34px;height:34px;border-radius:6px;object-fit:cover" />
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#3C096C">Digital Target</div>
+        <div style="font-size:12px;color:#6B7280">Hotel Register — offline hotel management software</div>
+      </div>
+      <div style="margin-inline-start:auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#6B7280;font-weight:600">WhatsApp</div>
+          <div style="margin-top:2px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#16202A">+92 345 1873354 · +92 332 2373354</div>
+        </div>
+        <div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#6B7280;font-weight:600">Email</div>
+          <div style="margin-top:2px;font-family:'IBM Plex Mono',monospace;font-size:12px"><a href="mailto:digitaltarget2025@gmail.com">digitaltarget2025@gmail.com</a></div>
+        </div>
+        <div style="display:flex;gap:14px;font-size:12px;font-weight:600">
+          <a href="https://web.facebook.com/digitaltargetpk/">Facebook</a>
+          <a href="https://www.instagram.com/digitaltarget_pk">Instagram</a>
+        </div>
+      </div>
+    </footer>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;hotelName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Kalam Continental&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#3C096C&quot;,&quot;options&quot;:[&quot;#3C096C&quot;,&quot;#5B1A9C&quot;,&quot;#1F3A2E&quot;,&quot;#2C6E8F&quot;],&quot;tsType&quot;:&quot;string&quot;}}">
+const C = {
+  ink: '#16202A', deodar: '#1F3A2E', river: '#2C6E8F', brass: '#3C096C',
+  line: '#E2E6E4', muted: '#6B7280', vacant: '#4B7F52', dirty: '#C98A16',
+  due: '#B3261E', blocked: '#6B7280'
+};
+
+const NAV = [
+  ['dashboard', 'Dashboard', 'ڈیش بورڈ'],
+  ['rooms', 'Rooms', 'کمرے'],
+  ['checkin', 'Check In', 'آمد'],
+  ['inhouse', 'In House', 'موجود مہمان'],
+  ['checkout', 'Check Out', 'روانگی'],
+  ['register', 'Register', 'روزنامچہ'],
+  ['bookings', 'Bookings', 'بکنگ'],
+  ['restaurant', 'Restaurant', 'ریسٹورنٹ'],
+  ['payments', 'Payments', 'وصولیاں'],
+  ['expenses', 'Expenses', 'اخراجات'],
+  ['reports', 'Reports', 'رپورٹس'],
+  ['settings', 'Settings', 'ترتیبات']
+];
+
+const TITLES = {
+  dashboard: ['Dashboard', 'ڈیش بورڈ — آج کا خلاصہ'],
+  rooms: ['Room board', 'کمروں کی صورتحال'],
+  checkin: ['Check in guest', 'مہمان کی آمد'],
+  inhouse: ['Guests in house', 'موجود مہمان'],
+  checkout: ['Check out and clearance', 'روانگی اور کلیئرنس'],
+  register: ['Register', 'روزنامچہ'],
+  bookings: ['Bookings', 'بکنگ'],
+  restaurant: ['Restaurant', 'ریسٹورنٹ'],
+  payments: ['Payments', 'وصولیاں'],
+  expenses: ['Expenses and cash book', 'اخراجات اور روزنامچہ نقدی'],
+  reports: ['Reports', 'رپورٹس'],
+  settings: ['Settings', 'ترتیبات']
+};
+
+const PLACEHOLDER = {
+  bookings: ['Advance reservations with a month calendar of held rooms per type.', ['List and booking form: guest, phone, room type, arrival, nights, advance, source', 'Month calendar — reserved vs available per room type per day', 'Convert to check-in pre-fills the check-in form', 'No-shows auto-flagged the morning after arrival']],
+  restaurant: ['Simple POS for the hotel kitchen, with posting to a guest folio.', ['Menu grid by category with Urdu names, running order panel', 'Table or room order, subtotal, tax, total', 'Print kitchen slip, bill and take payment, or post to room', "Today's orders list and menu manager"]],
+  payments: ['Every rupee received across the hotel in one ledger.', ['Date, receipt no, guest/room, type, method, amount, received by', 'Filter by date and method, daily total per method', 'Reprint any receipt', 'Standalone Take payment for a guest paying at reception']],
+  expenses: ['Daily spending and the cash book the owner checks each night.', ['Expense entry with category, paid to, and optional receipt photo', 'Cash book per day: opening, cash in, cash out, closing', 'Close day locks the day and prints the day close summary']],
+  reports: ['On-screen, printable, and CSV-exportable.', ["Manager's flash: rooms sold, occupancy, ADR, revenue, collection, net cash", 'Occupancy over a date range, arrival and departure lists', 'Outstanding dues, restaurant sales, expenses by category', 'Room-wise revenue and peak vs off-season comparison']],
+  settings: ['Everything the hotel configures once and rarely touches again.', ['Hotel profile, rooms setup, season rates, tax', 'Users and PINs with role permissions', 'Printer width (80mm / 58mm / A5), copies, test print', 'Backup and restore, reset demo data']]
+};
+
+const rs = n => 'Rs ' + n.toLocaleString('en-US');
+
+const ROOMS = [
+  { f: 'Ground floor', n: '101', t: 'Standard Double', s: 'occupied', g: 'Zahid Ullah', d: '1 night left · Rs 2,400 due' },
+  { f: 'Ground floor', n: '102', t: 'Standard Double', s: 'vacant' },
+  { f: 'Ground floor', n: '103', t: 'Standard Double', s: 'dirty' },
+  { f: 'Ground floor', n: '104', t: 'Standard Double', s: 'vacant' },
+  { f: 'Ground floor', n: '105', t: 'Deluxe Double', s: 'occupied', g: 'Farhan Malik', d: '2 nights left · settled' },
+  { f: 'Ground floor', n: '106', t: 'Deluxe Double', s: 'blocked' },
+  { f: 'First floor', n: '201', t: 'Deluxe Double', s: 'vacant' },
+  { f: 'First floor', n: '202', t: 'Deluxe Double', s: 'reserved', g: 'Noreen Baig', d: 'Arriving today 6:00 PM' },
+  { f: 'First floor', n: '203', t: 'Deluxe Double', s: 'occupied', g: 'Sardar Ali', d: '3 nights left · Rs 9,700 due' },
+  { f: 'First floor', n: '204', t: 'Deluxe Double', s: 'occupied', g: 'Muhammad Bilal', d: 'Due out today · Rs 12,050 due' },
+  { f: 'First floor', n: '205', t: 'Family Suite', s: 'vacant' },
+  { f: 'First floor', n: '206', t: 'Family Suite', s: 'dirty' },
+  { f: 'Second floor', n: '301', t: 'Family Suite', s: 'occupied', g: 'Ayesha Khan', d: '2 nights left · settled' },
+  { f: 'Second floor', n: '302', t: 'Family Suite', s: 'vacant' },
+  { f: 'Second floor', n: '303', t: 'Master Suite', s: 'vacant' },
+  { f: 'Second floor', n: '304', t: 'Master Suite', s: 'reserved', g: 'Tour group — Hunza Trails', d: 'Arriving 06 Aug' },
+  { f: 'Second floor', n: '305', t: 'Standard Double', s: 'vacant' },
+  { f: 'Second floor', n: '306', t: 'Standard Double', s: 'vacant' }
+];
+
+const STATUS_COLOR = { occupied: C.river, vacant: C.vacant, dirty: C.dirty, blocked: C.blocked, reserved: C.brass };
+
+class Component extends DCLogic {
+  state = {
+    screen: 'dashboard',
+    lang: 'en',
+    selRoom: '204',
+    picked: ['205'],
+    method: 'Cash',
+    regTab: 'All movements',
+    nights: '2',
+    rate: '14,000',
+    discount: '750',
+    advance: '10,000',
+    adults: '2',
+    children: '1',
+    companions: [
+      { name: 'Sana Bilal', relation: 'Wife', age: '31', cnic: '' },
+      { name: 'Hamza Bilal', relation: 'Son', age: '7', cnic: '' }
+    ]
+  };
+
+  go = s => this.setState({ screen: s });
+  num = v => Number(String(v).replace(/[^0-9.]/g, '')) || 0;
+
+  renderVals() {
+    const st = this.state;
+    const accent = this.props.accentColor || C.brass;
+    const screen = st.screen;
+
+    const nav = NAV.map(([id, label, labelUr]) => {
+      const on = id === screen;
+      return {
+        label, labelUr,
+        bar: on ? accent : 'transparent',
+        bg: on ? '#2B0A4A' : 'transparent',
+        fg: on ? '#F2EBF8' : '#B6A8C6',
+        onSelect: () => this.go(id)
+      };
+    });
+
+    const counts = { vacant: 0, occupied: 0, dirty: 0, blocked: 0, reserved: 0 };
+    ROOMS.forEach(r => counts[r.s]++);
+
+    const roomCard = r => ({
+      number: r.n, type: r.t, status: r.s, color: STATUS_COLOR[r.s],
+      guest: r.g || '—', detail: r.d || 'Ready to sell',
+      balColor: r.d && r.d.indexOf('due') > -1 ? C.due : C.muted,
+      onSelect: () => this.setState({ selRoom: r.n })
+    });
+
+    const floorNames = ['Ground floor', 'First floor', 'Second floor'];
+    const floors = floorNames.map(name => {
+      const rooms = ROOMS.filter(r => r.f === name);
+      const occ = rooms.filter(r => r.s === 'occupied').length;
+      return { name, summary: occ + ' of ' + rooms.length + ' occupied', rooms: rooms.map(roomCard) };
+    });
+
+    const selRaw = ROOMS.find(r => r.n === st.selRoom) || ROOMS[0];
+    const sel = {
+      number: selRaw.n, status: selRaw.s, color: STATUS_COLOR[selRaw.s],
+      rows: [
+        { k: 'Room type', v: selRaw.t },
+        { k: 'Floor', v: selRaw.f },
+        { k: 'Rate tonight', v: rs(selRaw.t === 'Master Suite' ? 20000 : selRaw.t === 'Family Suite' ? 14000 : selRaw.t === 'Deluxe Double' ? 8500 : 6000) },
+        { k: 'Guest', v: selRaw.g || '—' },
+        { k: 'Stay', v: selRaw.s === 'occupied' ? '2026-0087 · 03–05 Aug' : '—' },
+        { k: 'Balance', v: selRaw.d && selRaw.d.indexOf('due') > -1 ? selRaw.d.split('· ')[1] : 'Rs 0' }
+      ]
+    };
+
+    const kpis = [
+      { label: 'Rooms occupied', value: '5 / 18', sub: '28% occupancy', color: C.ink },
+      { label: "Today's check-ins", value: '3', sub: '2 still expected', color: C.ink },
+      { label: "Today's check-outs", value: '3', sub: '1 overdue', color: C.ink },
+      { label: "Today's collection", value: rs(46200), sub: 'Cash 28,000 · Easypaisa 18,200', color: C.deodar },
+      { label: 'Outstanding dues', value: rs(24150), sub: '3 guests', color: C.due },
+      { label: 'Cash in hand', value: rs(31400), sub: 'Day not closed', color: C.ink }
+    ];
+
+    const arrivals = [
+      { name: 'Noreen Baig', meta: 'Deluxe Double · 0333-4412200 · ETA 6:00 PM' },
+      { name: 'Tour group — Hunza Trails', meta: '4 rooms held · agent Shahid · ETA tomorrow' }
+    ];
+
+    const departures = [
+      { name: 'Muhammad Bilal', meta: 'Room 204 · in 03 Aug · 3 persons', balance: rs(12050), balColor: C.due, overdue: false },
+      { name: 'Zahid Ullah', meta: 'Room 101 · in 04 Aug · 2 persons', balance: rs(2400), balColor: C.due, overdue: true },
+      { name: 'Farhan Malik', meta: 'Room 105 · in 02 Aug · 2 persons', balance: rs(0), balColor: C.vacant, overdue: false }
+    ];
+
+    const statusStrip = [
+      { label: 'Vacant', count: counts.vacant, color: C.vacant },
+      { label: 'Occupied', count: counts.occupied, color: C.river },
+      { label: 'Reserved', count: counts.reserved, color: accent },
+      { label: 'Dirty', count: counts.dirty, color: C.dirty },
+      { label: 'Blocked', count: counts.blocked, color: C.blocked }
+    ];
+
+    const mv = {
+      In: { mvColor: C.deodar, mvBg: '#EAF0EC' },
+      Out: { mvColor: C.river, mvBg: '#E8F1F5' },
+      Cleared: { mvColor: '#3F5B33', mvBg: '#EDF3E9' },
+      Payment: { mvColor: '#3C096C', mvBg: '#F3ECF9' }
+    };
+    const recentRaw = [
+      ['2026-0088', '02:12 PM', 'Farhan Malik', '105', 'Payment', rs(8500)],
+      ['2026-0087', '11:24 AM', 'Muhammad Bilal', '204', 'Out', rs(12050)],
+      ['2026-0086', '10:50 AM', 'Iqbal Shah', '206', 'Cleared', rs(0)],
+      ['2026-0085', '09:30 AM', 'Ayesha Khan', '301', 'In', rs(14000)],
+      ['2026-0084', '08:05 AM', 'Zahid Ullah', '101', 'In', rs(6000)],
+      ['2026-0083', '07:40 AM', 'Sardar Ali', '203', 'In', rs(8500)]
+    ];
+    const recent = recentRaw.map(r => Object.assign({ sno: r[0], time: r[1], guest: r[2], room: r[3], movement: r[4], amount: r[5] }, mv[r[4]]));
+
+    const quickActions = [
+      { label: 'New check-in', key: 'F2', onSelect: () => this.go('checkin') },
+      { label: 'New booking', key: '', onSelect: () => this.go('bookings') },
+      { label: 'Take payment', key: '', onSelect: () => this.go('payments') },
+      { label: 'Add expense', key: '', onSelect: () => this.go('expenses') },
+      { label: 'Print register', key: 'F8', onSelect: () => this.go('register') }
+    ];
+
+    const vacantRooms = ROOMS.filter(r => r.s === 'vacant').map(r => {
+      const on = st.picked.indexOf(r.n) > -1;
+      return {
+        number: r.n, type: r.t,
+        border: on ? accent : C.line,
+        bg: on ? '#F3ECF9' : '#FFFFFF',
+        fg: on ? '#3C096C' : C.ink,
+        onToggle: () => this.setState(s => ({
+          picked: s.picked.indexOf(r.n) > -1 ? s.picked.filter(x => x !== r.n) : s.picked.concat([r.n])
+        }))
+      };
+    });
+
+    const nights = this.num(st.nights);
+    const rate = this.num(st.rate);
+    const rooms = Math.max(st.picked.length, 1);
+    const roomCharge = nights * rate * rooms;
+    const discount = this.num(st.discount);
+    const taxable = Math.max(roomCharge - discount, 0);
+    const tax = Math.round(taxable * 0.05);
+    const total = taxable + tax;
+    const advance = this.num(st.advance);
+    const balance = total - advance;
+
+    const billLines = [
+      { label: 'Room charges — ' + rooms + ' room x ' + nights + ' nt', value: rs(roomCharge), color: C.ink, weight: '500' },
+      { label: 'Discount', value: '−' + rs(discount), color: C.muted, weight: '500' },
+      { label: 'Tax 5%', value: rs(tax), color: C.muted, weight: '500' },
+      { label: 'Grand total', value: rs(total), color: C.ink, weight: '700' },
+      { label: 'Advance received', value: rs(advance), color: C.deodar, weight: '500' }
+    ];
+
+    const inHouseCols = ['S.No', 'Room', 'Guest', 'Phone', 'In', 'Expected out', 'Nt', 'Charges', 'Paid', 'Balance', 'Actions']
+      .map((label, i) => ({ label, align: i >= 6 ? 'end' : 'start' }));
+
+    const inHouseRaw = [
+      ['2026-0087', '204', 'Muhammad Bilal', '0300-1234567', '03 Aug', '05 Aug', 2, 22050, 10000],
+      ['2026-0086', '301', 'Ayesha Khan', '0321-8899001', '04 Aug', '07 Aug', 3, 44100, 44100],
+      ['2026-0085', '101', 'Zahid Ullah', '0345-7712345', '04 Aug', '05 Aug', 1, 8400, 6000],
+      ['2026-0084', '203', 'Sardar Ali', '0301-4455667', '02 Aug', '08 Aug', 6, 53550, 43850]
+    ];
+    const inHouse = inHouseRaw.map(r => {
+      const bal = r[7] - r[8];
+      return {
+        sno: r[0], room: r[1], guest: r[2], phone: r[3], in: r[4], out: r[5],
+        nights: r[6], charges: rs(r[7]), paid: rs(r[8]),
+        balance: rs(bal), balColor: bal > 0 ? C.due : C.vacant
+      };
+    });
+
+    const folioRaw = [
+      ['Room 204 — Deluxe Double x 2 nights', 'Room', '2', '8,500', '17,000', '600'],
+      ['Extra bed', 'Room', '1', '1,500', '1,500', '500'],
+      ['Trout fish, Chapli Kabab, Roti', 'Restaurant', '1', '2,650', '2,650', '500'],
+      ['Chai (4)', 'Restaurant', '4', '150', '600', '400'],
+      ['Heater — 2 nights', 'Other', '2', '300', '600', '400'],
+      ['Laundry', 'Other', '3', '150', '450', '400']
+    ];
+    const folio = folioRaw.map(f => ({ desc: f[0], group: f[1], qty: f[2], rate: f[3], amount: f[4], weight: f[5] }));
+
+    const folioTotals = [
+      { label: 'Subtotal', value: rs(22800), color: C.ink, weight: '500', size: '13px' },
+      { label: 'Discount', value: '−' + rs(750), color: C.muted, weight: '500', size: '13px' },
+      { label: 'Tax 5%', value: rs(1102), color: C.muted, weight: '500', size: '13px' },
+      { label: 'Grand total', value: rs(23152), color: C.ink, weight: '700', size: '18px' },
+      { label: 'Total paid', value: rs(11102), color: C.deodar, weight: '600', size: '13px' },
+      { label: 'Balance due', value: rs(12050), color: C.due, weight: '700', size: '18px' }
+    ];
+
+    const methods = ['Cash', 'Easypaisa', 'JazzCash', 'Bank', 'Card'].map(label => {
+      const on = st.method === label;
+      return {
+        label,
+        border: on ? accent : C.line,
+        bg: on ? '#F3ECF9' : '#FFFFFF',
+        fg: on ? '#3C096C' : C.ink,
+        onSelect: () => this.setState({ method: label })
+      };
+    });
+
+    const regTabs = ['All movements', 'In', 'Out', 'Cleared', 'Pending clearance'].map(label => {
+      const on = st.regTab === label;
+      return {
+        label,
+        bg: on ? accent : '#FFFFFF',
+        fg: on ? '#FFFFFF' : C.ink,
+        onSelect: () => this.setState({ regTab: label })
+      };
+    });
+
+    const regCols = [
+      ['S.No', 'start'], ['Date', 'start'], ['Time', 'start'], ['Guest name', 'start'], ['CNIC', 'start'],
+      ['Room', 'start'], ['Persons', 'end'], ['Coming from', 'start'], ['Going to', 'start'], ['Vehicle', 'start'],
+      ['In', 'start'], ['Out', 'start'], ['Charges', 'end'], ['Paid', 'end'], ['Balance', 'end'], ['Cleared', 'start']
+    ].map(c => ({ label: c[0], align: c[1] }));
+
+    const regRaw = [
+      ['2026-0087', '03 Aug 2026', '02:10 PM', 'Muhammad Bilal', '15302-1234567-1', '204', 3, 'Islamabad', 'Kalam', 'LEB-1234', '03 Aug', '05 Aug', 23152, 11102, 'No'],
+      ['2026-0086', '04 Aug 2026', '09:30 AM', 'Ayesha Khan', '35202-9988771-4', '301', 5, 'Lahore', 'Naran', 'LEA-7788', '04 Aug', '—', 44100, 44100, 'Yes'],
+      ['2026-0085', '04 Aug 2026', '08:05 AM', 'Zahid Ullah', '17301-4455662-9', '101', 2, 'Mardan', 'Swat', 'MRD-2211', '04 Aug', '—', 8400, 6000, 'No'],
+      ['2026-0084', '02 Aug 2026', '07:40 AM', 'Sardar Ali', '15602-1122334-7', '203', 4, 'Karachi', 'Hunza', 'AJK-9090', '02 Aug', '—', 53550, 43850, 'No'],
+      ['2026-0083', '01 Aug 2026', '05:15 PM', 'Iqbal Shah', '15302-7766554-3', '206', 2, 'Peshawar', 'Kalam', 'PES-4512', '01 Aug', '03 Aug', 17850, 17850, 'Yes'],
+      ['2026-0082', '01 Aug 2026', '12:40 PM', 'Rukhsana Bibi', '15302-3344556-8', '105', 3, 'Rawalpindi', 'Malam Jabba', '—', '01 Aug', '02 Aug', 8925, 8925, 'Yes'],
+      ['2026-0081', '31 Jul 2026', '06:50 PM', 'Waqar Ahmed', '61101-2233445-1', '303', 2, 'Islamabad', 'Kalam', 'ISB-3344', '31 Jul', '02 Aug', 42000, 42000, 'Yes'],
+      ['2026-0080', '31 Jul 2026', '03:05 PM', 'Naveed Anjum', '35201-5566778-2', '102', 4, 'Faisalabad', 'Naran', 'FSD-1010', '31 Jul', '01 Aug', 12600, 12600, 'Yes']
+    ];
+    const regRows = regRaw.map(r => {
+      const bal = r[12] - r[13];
+      const yes = r[14] === 'Yes';
+      return {
+        sno: r[0], date: r[1], time: r[2], guest: r[3], cnic: r[4], room: r[5], persons: r[6],
+        from: r[7], to: r[8], vehicle: r[9], inAt: r[10], outAt: r[11],
+        charges: rs(r[12]), paid: rs(r[13]), balance: rs(bal),
+        balColor: bal > 0 ? C.due : C.ink,
+        cleared: yes ? 'Cleared' : 'Pending',
+        clColor: yes ? '#3F5B33' : C.dirty,
+        clBg: yes ? '#EDF3E9' : '#FBF3E2'
+      };
+    });
+
+    const regTotals = [
+      { label: 'Entries', value: '8', color: C.ink },
+      { label: 'Guests', value: '25', color: C.ink },
+      { label: 'Total charges', value: rs(210577), color: C.ink },
+      { label: 'Collected', value: rs(186427), color: C.deodar },
+      { label: 'Outstanding', value: rs(24150), color: C.due }
+    ];
+
+    const ph = PLACEHOLDER[screen];
+    const title = TITLES[screen] || TITLES.dashboard;
+
+    return {
+      accent,
+      dir: st.lang === 'ur' ? 'rtl' : 'ltr',
+      langLabel: st.lang === 'ur' ? 'English' : 'اردو',
+      toggleLang: () => this.setState(s => ({ lang: s.lang === 'ur' ? 'en' : 'ur' })),
+      hotelName: this.props.hotelName || 'Kalam Continental',
+      pageTitle: title[0],
+      pageTitleUr: title[1],
+      nav,
+      isDash: screen === 'dashboard',
+      isRooms: screen === 'rooms',
+      isCheckIn: screen === 'checkin',
+      isInHouse: screen === 'inhouse',
+      isCheckOut: screen === 'checkout',
+      isRegister: screen === 'register',
+      isPlaceholder: !!ph,
+      placeholderNote: ph ? ph[0] : '',
+      placeholderItems: ph ? ph[1] : [],
+      goDash: () => this.go('dashboard'),
+      goRooms: () => this.go('rooms'),
+      goCheckIn: () => this.go('checkin'),
+      goCheckOut: () => this.go('checkout'),
+      goRegister: () => this.go('register'),
+      kpis, arrivals, departures, statusStrip, recent, quickActions,
+      floors, sel,
+      vacantRooms, billLines,
+      balance: rs(Math.max(balance, 0)),
+      balanceColor: balance > 0 ? C.due : C.vacant,
+      nights: st.nights, rate: st.rate, discount: st.discount, advance: st.advance,
+      adults: st.adults, children: st.children,
+      expectedOut: '07 Aug 2026  11:00 AM',
+      onNights: e => this.setState({ nights: e.target.value }),
+      onRate: e => this.setState({ rate: e.target.value }),
+      onDiscount: e => this.setState({ discount: e.target.value }),
+      onAdvance: e => this.setState({ advance: e.target.value }),
+      onAdults: e => this.setState({ adults: e.target.value }),
+      onChildren: e => this.setState({ children: e.target.value }),
+      companions: st.companions.map((c, i) => Object.assign({}, c, {
+        onRemove: () => this.setState(s => ({ companions: s.companions.filter((_, j) => j !== i) }))
+      })),
+      addCompanion: () => this.setState(s => ({ companions: s.companions.concat([{ name: '', relation: '', age: '', cnic: '' }]) })),
+      inHouseCols, inHouse,
+      folio, folioTotals, methods,
+      regTabs, regCols, regRows, regTotals
+    };
+  }
+}
+</script>
+</body>
+</html>
