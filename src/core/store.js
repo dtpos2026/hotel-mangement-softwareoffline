@@ -122,7 +122,16 @@ export class AppStore {
     });
   }
 
+  /**
+   * Language and other per-device preferences are open to anyone signed in;
+   * everything else in settings is guarded. Without this split a receptionist
+   * could rewrite the tax rate or the printer profile.
+   */
   async updateSetting(id, patch) {
+    const OPEN_KEYS = ['language'];
+    const guarded = id !== 'app' || Object.keys(patch).some(k => OPEN_KEYS.indexOf(k) === -1);
+    if (guarded) this.session.require('settings.manage');
+
     const current = this.setting(id);
     const next = Object.assign({}, current, patch, { id });
     await this.write('settings.update', (tx, log) => {
@@ -134,6 +143,7 @@ export class AppStore {
   }
 
   async updateProperty(patch) {
+    this.session.require('settings.manage');
     const next = Object.assign({}, this.property, patch, { updatedAt: nowIso() });
     await this.write('property.update', (tx, log) => {
       tx.put('property', next);
