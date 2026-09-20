@@ -128,7 +128,9 @@ export class AppStore {
    * could rewrite the tax rate or the printer profile.
    */
   async updateSetting(id, patch) {
-    const OPEN_KEYS = ['language'];
+    // lastAutoBackupAt is system bookkeeping, not a user setting, so the
+    // automatic daily backup still records itself under any role.
+    const OPEN_KEYS = ['language', 'lastAutoBackupAt'];
     const guarded = id !== 'app' || Object.keys(patch).some(k => OPEN_KEYS.indexOf(k) === -1);
     if (guarded) this.session.require('settings.manage');
 

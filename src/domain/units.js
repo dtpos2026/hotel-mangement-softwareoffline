@@ -29,10 +29,29 @@ export function listUnits(store, opts) {
   return list.slice().sort(compareUnits);
 }
 
-/** "101" before "102" before "1010"; names sort naturally alongside numbers. */
+/**
+ * Floors in the order a person walks them, then "101" before "102" before
+ * "1010" — names sort naturally alongside numbers.
+ */
+const FLOOR_ORDER = ['basement', 'lower ground', 'ground', 'first', 'second', 'third',
+                     'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
+
+export function floorRank(name) {
+  const key = String(name || '').toLowerCase().replace(/\s*floor\s*/g, '').trim();
+  const i = FLOOR_ORDER.indexOf(key);
+  if (i > -1) return i;
+  const numeric = /^(\d+)/.exec(key);
+  if (numeric) return 100 + Number(numeric[1]);
+  return 500;
+}
+
 export function compareUnits(a, b) {
   const fa = String(a.floor || ''), fb = String(b.floor || '');
-  if (fa !== fb) return fa.localeCompare(fb, undefined, { numeric: true });
+  if (fa !== fb) {
+    const ra = floorRank(fa), rb = floorRank(fb);
+    if (ra !== rb) return ra - rb;
+    return fa.localeCompare(fb, undefined, { numeric: true });
+  }
   return String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true });
 }
 
@@ -49,7 +68,10 @@ export function unitTypeName(store, unitTypeId) {
 export function floorsOf(store) {
   const seen = new Set();
   listUnits(store).forEach(u => { if (u.floor) seen.add(String(u.floor)); });
-  return Array.from(seen).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return Array.from(seen).sort((a, b) => {
+    const ra = floorRank(a), rb = floorRank(b);
+    return ra !== rb ? ra - rb : a.localeCompare(b, undefined, { numeric: true });
+  });
 }
 
 export function countByStatus(store) {

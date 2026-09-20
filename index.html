@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hotel Register — Offline Accommodation Management</title>
+<meta name="description" content="Offline hotel, guest house, resort and apartment management. All data stays on this computer.">
+<meta name="color-scheme" content="light">
+
+<!--
+  Fonts.
+
+  This is an offline product, so the web fonts must never be required. The
+  stylesheet link below is an enhancement: when the machine happens to be
+  online it loads the typefaces the design was drawn with. Offline, the link
+  fails silently and the stacks in app.css take over.
+
+  The Urdu stack matters most. It names the Nastaliq fonts that are actually
+  installed on Pakistani Windows machines (Jameel Noori Nastaleeq first, which
+  is what most properties already have) before falling back to a serif, so
+  Urdu keeps its proper Nastaliq shaping with no internet and no bundled files.
+
+  To pin the typography completely offline, drop the .woff2 files into
+  assets/fonts/ and add the @font-face rules described in docs/FONTS.md.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;600&display=swap">
+
+<link rel="stylesheet" href="styles/app.css">
+<link rel="icon" href="assets/brand-digital-target.jpg">
+</head>
+<body>
+  <div id="root">
+    <noscript>
+      <div style="padding:40px;font-family:system-ui,sans-serif;max-width:520px;margin:0 auto">
+        <h1 style="font-size:18px">JavaScript is switched off</h1>
+        <p style="color:#6B7280;line-height:1.6">This application runs entirely in your browser with no server.
+        Switch JavaScript on for this page and reload.</p>
+      </div>
+    </noscript>
+  </div>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

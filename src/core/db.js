@@ -49,13 +49,23 @@ class IndexedDbAdapter {
     return new IndexedDbAdapter(db);
   }
 
+  /**
+   * Runs `fn` inside a transaction and resolves with the request's result once
+   * the transaction commits. The result is read off the IDBRequest itself —
+   * testing for `result !== undefined` would hand back the raw request whenever
+   * a lookup legitimately finds nothing, which is exactly what happens on a
+   * first run.
+   */
   _run(store, mode, fn) {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(store, mode);
       const os = tx.objectStore(store);
       let out;
       try { out = fn(os); } catch (err) { reject(err); return; }
-      tx.oncomplete = () => resolve(out && out.result !== undefined ? out.result : out);
+      tx.oncomplete = () => {
+        const isRequest = typeof IDBRequest !== 'undefined' && out instanceof IDBRequest;
+        resolve(isRequest ? out.result : out);
+      };
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error || new Error('transaction aborted'));
     });
@@ -63,7 +73,9 @@ class IndexedDbAdapter {
 
   async loadSnapshot() {
     const raw = await this._run(STORE_KV, 'readonly', os => os.get(SNAPSHOT_KEY));
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    if (typeof raw !== 'string') throw new Error('stored snapshot is not readable');
+    return JSON.parse(raw);
   }
 
   async saveSnapshot(data) {
