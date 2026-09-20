@@ -1,91 +1,91 @@
 /**
  * Activation and licence status.
  *
- * Shown full-screen when the trial has run out or a stored licence has gone
- * bad, and reachable from Settings at any time. The wording is deliberately
- * plain: a receptionist who cannot open the software at 9pm needs to know
- * exactly what to send their supplier, not a error code.
+ * Shown full-screen until the software is activated, and reachable from
+ * Settings afterwards. Activation needs the internet once; the wording says so
+ * plainly, because a receptionist standing at a desk with no signal needs to
+ * know whether to wait or to call someone.
  */
 
 import { h, mount, qs, busy } from '../dom.js';
-import { card, alert, field, railRows, badge } from '../components.js';
+import { card, alert, railRows, badge } from '../components.js';
 import { toast, ok as toastOk, fail, confirm } from '../feedback.js';
 import * as host from '../../core/host.js';
-import { formatKey, KEY_BYTES } from '../../core/license.js';
+import { formatKey, normaliseKey, isWellFormed, KEY_GROUPS, KEY_GROUP_LEN } from '../../core/licence-model.js';
 
-const KEY_CHARS = KEY_BYTES * 8 / 5;   // 144
+const KEY_CHARS = KEY_GROUPS * KEY_GROUP_LEN;
 
-/** Full-screen gate. Nothing else is reachable until a licence is accepted. */
+/** Full-screen gate. Nothing else is reachable until the licence is accepted. */
 export function activationGate(root, status, onActivated) {
-  const holder = h('div', {
+  const body = h('div', { style: { width: '100%', maxWidth: '560px' } });
+  mount(root, h('div', {
     style: {
       minHeight: '100vh', background: 'var(--canvas)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 20px'
     }
-  });
+  }, body));
 
-  const body = h('div', { style: { width: '100%', maxWidth: '620px' } });
-  holder.appendChild(body);
-  mount(root, holder);
-
-  const draw = (current) => {
-    mount(body, [
-      h('div', { style: { textAlign: 'center', marginBottom: '22px' } }, [
-        h('div', {
-          style: {
-            width: '54px', height: '54px', margin: '0 auto 14px', borderRadius: '11px',
-            background: 'var(--accent)', color: '#F2EBF8', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-mono)', fontWeight: '700', fontSize: '18px'
-          }, text: 'HR'
-        }),
-        h('h1', { style: { fontSize: '21px' }, text: 'Hotel Register' }),
-        h('div.text-sm.text-muted', { style: { marginTop: '4px' }, text: 'Offline Accommodation Management' })
-      ]),
-      activationCard(current, onActivated)
-    ]);
-  };
+  const draw = (current) => mount(body, [
+    h('div', { style: { textAlign: 'center', marginBottom: '22px' } }, [
+      h('div', {
+        style: {
+          width: '54px', height: '54px', margin: '0 auto 14px', borderRadius: '11px',
+          background: 'var(--accent)', color: '#F2EBF8', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'var(--font-mono)', fontWeight: '700', fontSize: '18px'
+        }, text: 'HR'
+      }),
+      h('h1', { style: { fontSize: '21px' }, text: 'Hotel Register' }),
+      h('div.text-sm.text-muted', { style: { marginTop: '4px' }, text: 'Offline Accommodation Management' })
+    ]),
+    activationCard(current, onActivated)
+  ]);
 
   draw(status);
   return { redraw: draw };
 }
 
-/** The card itself — reused inside Settings, where it is not a gate. */
+/** The card itself, reused inside Settings where it is not a gate. */
 export function activationCard(status, onActivated, opts) {
   const o = opts || {};
-  const inline = !!o.inline;
-  const keyBox = h('textarea.textarea.input--mono', {
-    name: 'licenceKey',
-    rows: 5,
-    placeholder: '040G7R-859R01-J00500-ZG0000\n07AVGA-G532B0-000001-D7MASS\n…',
-    style: { letterSpacing: '0.04em', lineHeight: '1.7', fontSize: '13px' },
-    autofocus: !inline,
-    oninput: () => updateCount()
-  });
-  const counter = h('div.field__hint');
   const machineRow = h('div');
+  const helpRow = h('div');
 
-  function cleanKey() {
-    return String(keyBox.value || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
-  }
+  const keyInput = h('input.input.input--mono', {
+    name: 'licenceKey',
+    placeholder: 'HR-XXXX-XXXX-XXXX',
+    autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false',
+    autofocus: !o.inline,
+    style: { fontSize: '19px', letterSpacing: '0.13em', textAlign: 'center', padding: '13px 12px' },
+    oninput: (e) => {
+      // Reformat as they type, keeping the caret at the end.
+      const body = normaliseKey(e.target.value).slice(0, KEY_CHARS);
+      e.target.value = body ? formatKey(body) : '';
+      updateHelp();
+    },
+    onkeydown: (e) => { if (e.key === 'Enter') qs('[data-activate]', helpRow.parentNode || document).click(); }
+  });
 
-  function updateCount() {
-    const n = cleanKey().length;
-    counter.textContent = n === 0
-      ? `A licence key is ${KEY_CHARS} characters. Paste it here — spaces, dashes and line breaks are ignored.`
-      : n < KEY_CHARS ? `${n} of ${KEY_CHARS} characters — the key looks incomplete.`
-      : n > KEY_CHARS ? `${n} characters — that is longer than a licence key.`
-      : `${n} of ${KEY_CHARS} characters — ready to activate.`;
-    counter.style.color = n === KEY_CHARS ? 'var(--deodar)' : (n > KEY_CHARS ? 'var(--due)' : 'var(--muted)');
+  function typed() { return normaliseKey(keyInput.value); }
+
+  function updateHelp() {
+    const n = typed().length;
+    mount(helpRow, h('div.field__hint', {
+      style: { color: n === KEY_CHARS ? 'var(--deodar)' : 'var(--muted)' },
+      text: n === 0
+        ? 'Type the key exactly as your supplier sent it. Capitals and dashes are added for you.'
+        : n < KEY_CHARS ? `${n} of ${KEY_CHARS} characters`
+        : 'Ready to activate.'
+    }));
   }
-  updateCount();
+  updateHelp();
 
   host.machineCode().then(code => {
     if (!code) return;
     mount(machineRow, h('div', {
       style: {
         background: 'var(--surface-sunk)', border: '1px solid var(--line)',
-        borderRadius: 'var(--r)', padding: '10px 12px', marginTop: '12px'
+        borderRadius: 'var(--r)', padding: '10px 12px'
       }
     }, [
       h('div.field__label', { text: "This computer's code" }),
@@ -95,141 +95,145 @@ export function activationCard(status, onActivated, opts) {
           type: 'button', text: 'Copy',
           onclick: async () => {
             try { await navigator.clipboard.writeText(code); toastOk('Copied', code); }
-            catch { toast('warn', 'Could not copy', 'Select the code and copy it by hand.'); }
+            catch { toast('warn', 'Could not copy', 'Read the code out instead.'); }
           }
         })
       ]),
       h('div.field__hint', { style: { marginTop: '4px' },
-        text: 'Send this to your supplier if your licence is tied to one computer.' })
+        text: 'Your supplier may ask for this when issuing or moving a licence.' })
     ]));
   });
 
-  const statusTone = status.licensed ? (status.expiringSoon ? 'warn' : 'ok')
-    : (status.status === 'trial' ? 'info' : 'due');
+  const tone = status.licensed ? (status.expiringSoon ? 'warn' : 'ok')
+    : (status.status === 'offline' ? 'info' : 'due');
 
-  const activate = async (e) => busy(e.currentTarget, async () => {
-    const key = cleanKey();
-    if (!key) { toast('warn', 'Enter your licence key'); keyBox.focus(); return; }
-    if (key.length !== KEY_CHARS) {
-      toast('warn', 'That key looks incomplete',
-        `A licence key is ${KEY_CHARS} characters; this one has ${key.length}. Paste the whole thing, including every line.`);
-      return;
-    }
-    try {
-      const result = await host.activateLicence(key);
-      if (!result.ok) { toast('error', 'Could not activate', result.message); return; }
-      toastOk('Licence activated.', result.status && result.status.message);
-      if (onActivated) onActivated(result.status);
-    } catch (err) { fail(err, 'Could not activate'); }
-  });
+  async function activate(e) {
+    return busy(e.currentTarget, async () => {
+      const key = typed();
+      if (!key) { toast('warn', 'Enter your licence key'); keyInput.focus(); return; }
+      if (!isWellFormed(key)) {
+        toast('warn', 'That key is not complete',
+          `A licence key has ${KEY_CHARS} characters after HR-. This one has ${key.length}.`);
+        keyInput.focus();
+        return;
+      }
+      try {
+        const result = await host.activateLicence(formatKey(key));
+        if (!result.ok) {
+          toast(result.offline ? 'warn' : 'error',
+            result.offline ? 'Internet needed to activate' : 'Could not activate',
+            result.message);
+          return;
+        }
+        toastOk('Activated.', result.status && result.status.message);
+        if (onActivated) onActivated(result.status);
+      } catch (err) { fail(err, 'Could not activate'); }
+    });
+  }
+
+  const d = status.details;
 
   return card({
-    title: status.licensed ? 'Licence' : 'Activate this copy',
-    tools: [badge(statusLabel(status), statusTone)]
+    title: status.licensed ? 'Licence' : 'Activate your software',
+    tools: [badge(statusLabel(status), tone)]
   }, h('div.stack', [
-    alert(statusTone, statusHeadline(status), status.message),
+    alert(tone, headline(status), status.message),
 
-    status.licensed && status.details ? railRows([
-      { k: 'Plan', v: status.details.plan },
-      { k: 'Licence no', v: status.details.licenceNo },
-      { k: 'Issued', v: status.details.issued },
-      { k: 'Expires', v: status.details.expires },
-      { k: 'Units allowed', v: status.details.units },
-      { k: 'Users allowed', v: status.details.users },
-      { k: 'Computer', v: status.details.machineBound ? 'Tied to this computer' : 'Any computer' }
+    status.licensed && d ? railRows([
+      { k: 'Licensed to', v: d.businessName || '—' },
+      d.ownerName ? { k: 'Owner', v: d.ownerName } : null,
+      d.phone ? { k: 'Phone', v: d.phone } : null,
+      { k: 'Licence key', v: d.key },
+      { k: 'Plan', v: d.plan },
+      { k: 'Activated', v: d.activatedAt ? String(d.activatedAt).slice(0, 10) : '—' },
+      { k: 'Expires', v: d.expires },
+      { k: 'Units allowed', v: d.units },
+      { k: 'Users allowed', v: d.users },
+      { k: 'Last checked', v: status.lastVerifiedAt ? String(status.lastVerifiedAt).slice(0, 10) : '—' }
     ]) : null,
 
-    status.licensed && status.details && status.details.features.length
-      ? h('div', [
-          h('div.field__label', { text: 'Included' }),
-          h('div.row.row--tight', { style: { marginTop: '6px' } },
-            status.details.features.map(f => badge(f, 'muted')))
-        ])
-      : null,
+    status.licensed && d && d.featureLabels.length ? h('div', [
+      h('div.field__label', { text: 'Included' }),
+      h('div.row.row--tight', { style: { marginTop: '6px' } }, d.featureLabels.map(f => badge(f, 'muted')))
+    ]) : null,
 
     !status.licensed ? h('div.field', [
       h('label.field__label', { text: 'Licence key' }),
-      keyBox,
-      counter
+      keyInput,
+      helpRow
     ]) : null,
 
     !status.licensed ? machineRow : null,
 
-    !status.licensed ? h('div.row', { style: { marginTop: '4px' } }, [
-      h('button.btn.btn--primary.btn--lg', { type: 'button', text: 'Activate', onclick: activate }),
-      host.isDesktop ? h('button.btn', {
-        type: 'button', text: 'Load from file…',
-        onclick: async () => {
-          const result = await host.openFile({
-            title: 'Choose your licence file',
-            filters: [{ name: 'Licence file', extensions: ['lic', 'txt'] }]
-          });
-          if (result.cancelled) return;
-          if (!result.ok) { toast('error', 'Could not read the file', result.message); return; }
-          keyBox.value = String(result.content || '').trim();
-          updateCount();
-          toastOk('Licence file loaded', 'Press Activate to continue.');
-        }
-      }) : null,
-      status.status === 'trial' && status.trialDaysLeft > 0 && o.onContinueTrial
-        ? h('button.btn.btn--ghost', { type: 'button', text: `Continue trial (${status.trialDaysLeft} days left)`,
-            onclick: () => o.onContinueTrial() })
-        : null
+    !status.licensed ? h('div.row', [
+      h('button.btn.btn--primary.btn--lg', { type: 'button', 'data-activate': '1', text: 'Activate', onclick: activate })
     ]) : null,
+
+    !status.licensed ? alert('info', 'Internet is needed once',
+      'Activation checks your key with the licence server. After that the software runs completely offline — no connection is needed for day-to-day work.') : null,
 
     status.licensed && host.isDesktop ? h('div.row', [
       h('button.btn', {
-        type: 'button', text: 'Remove licence from this computer',
+        type: 'button', text: 'Check licence now',
+        onclick: e => busy(e.currentTarget, async () => {
+          const next = await host.recheckLicence();
+          toast(next.licensed ? 'ok' : 'warn',
+            next.licensed ? 'Licence confirmed' : 'Licence problem', next.message);
+          if (onActivated) onActivated(next);
+        })
+      }),
+      h('button.btn', {
+        type: 'button', text: 'Remove from this computer',
         onclick: async () => {
           const go = await confirm({
             title: 'Remove the licence?',
-            message: 'The software will stop working on this computer until a licence is entered again. Your data is not touched. Keep your key — you will need it to activate again or to move to another computer.',
+            message: 'The software will stop opening on this computer until a key is entered again. Your data is not touched. Keep the key — you will need it to activate again, and your supplier must release it before it works on another computer.',
             danger: true, confirmLabel: 'Remove licence'
           });
           if (!go) return;
-          const result = await host.deactivateLicence();
+          const next = await host.deactivateLicence();
           toastOk('Licence removed');
-          if (onActivated) onActivated(result.status);
+          if (onActivated) onActivated(next);
         }
       })
-    ]) : null,
-
-    h('div.text-xs.text-muted', { style: { marginTop: '6px', lineHeight: '1.6' },
-      text: 'No internet connection is used. Your licence is checked on this computer only.' })
+    ]) : null
   ]));
 }
 
 function statusLabel(status) {
   switch (status.status) {
-    case 'valid': return 'Licensed';
-    case 'trial': return status.licensed ? 'Trial licence' : 'Trial';
+    case 'active': return 'Licensed';
     case 'expired': return 'Expired';
-    case 'wrong_machine': return 'Wrong computer';
-    case 'tampered': return 'Invalid key';
-    case 'malformed': return 'Unreadable key';
-    case 'future_version': return 'Newer licence';
+    case 'revoked': return 'Withdrawn';
+    case 'wrong_machine': return 'Another computer';
+    case 'not_found': return 'Unknown key';
+    case 'tampered': return 'Re-activation needed';
+    case 'recheck_required': return 'Check needed';
+    case 'offline': return 'No internet';
     case 'web': return 'Preview';
     default: return 'Not activated';
   }
 }
 
-function statusHeadline(status) {
+function headline(status) {
   if (status.licensed && status.expiringSoon) return 'Your licence is about to expire';
   if (status.licensed) return 'This copy is licensed';
   switch (status.status) {
-    case 'trial': return `Trial — ${status.trialDaysLeft} day(s) remaining`;
     case 'expired': return 'Your licence has expired';
-    case 'wrong_machine': return 'This licence belongs to another computer';
-    case 'tampered': return 'This licence key is not valid';
-    case 'future_version': return 'This licence needs a newer version';
-    default: return 'Enter your licence key to continue';
+    case 'revoked': return 'This licence has been withdrawn';
+    case 'wrong_machine': return 'This licence is in use on another computer';
+    case 'not_found': return 'That key was not recognised';
+    case 'tampered': return 'Please activate again';
+    case 'recheck_required': return 'Connect to the internet once';
+    case 'offline': return 'No internet connection';
+    default: return 'Enter your licence key to begin';
   }
 }
 
 /** Settings tab. */
 export function render(ctx) {
   const { app } = ctx;
-  const holder = h('div.stack');
+  const holder = h('div.stack', h('div.text-sm.text-muted', { text: 'Checking licence…' }));
   host.licenceStatus().then(status => {
     host.setLicence(status);
     mount(holder, activationCard(status, () => app.refresh(), { inline: true }));

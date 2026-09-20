@@ -6,6 +6,7 @@ import { AppStore } from './core/store.js';
 import { App } from './ui/app.js';
 import * as host from './core/host.js';
 import { activationGate } from './ui/screens/activation.js';
+import { loginGate } from './ui/screens/login.js';
 import { h, mount, qs } from './ui/dom.js';
 import { toast, modal, ok as toastOk, fail } from './ui/feedback.js';
 import { field, alert } from './ui/components.js';
@@ -79,10 +80,11 @@ async function boot() {
     return;
   }
 
-  // Sign in the first active user. A PIN, when set, is asked for on switching.
-  const users = store.users().filter(u => u.active);
-  const preferred = users.find(u => u.role === 'admin') || users[0];
-  if (preferred) store.signIn(preferred);
+  // Sign-in gate. Nothing is rendered until a real user is signed in, so the
+  // app never starts up as somebody.
+  await new Promise(resolve => {
+    loginGate(root, store, () => resolve());
+  });
 
   const screens = {};
   for (const id of Object.keys(SCREEN_MODULES)) screens[id] = SCREEN_MODULES[id].render;

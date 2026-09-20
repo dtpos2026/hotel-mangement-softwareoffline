@@ -43,7 +43,7 @@ export async function licenceStatus() {
     return {
       ok: true, licensed: true, status: 'web', unenforced: true,
       message: 'Browser preview — licensing applies to the installed desktop application.',
-      details: null, features: null, limits: null
+      details: null, features: null, limits: null, machineCode: ''
     };
   }
   try { return await api.licence.status(); }
@@ -53,6 +53,19 @@ export async function licenceStatus() {
 export async function activateLicence(key) {
   if (!isDesktop) return { ok: false, message: 'Activation is only available in the installed desktop application.' };
   return api.licence.activate(key);
+}
+
+/** Asks the licence server for a fresh answer. Needs internet. */
+export async function recheckLicence() {
+  if (!isDesktop) return licenceStatus();
+  try { return await api.licence.recheck(); }
+  catch (err) { return { ok: false, status: 'error', message: String(err && err.message || err) }; }
+}
+
+/** Fires when a background re-check changes the licence state. */
+export function onLicenceChanged(handler) {
+  if (!isDesktop || !api.onLicenceChanged) return () => {};
+  return api.onLicenceChanged(handler);
 }
 
 export async function deactivateLicence() {

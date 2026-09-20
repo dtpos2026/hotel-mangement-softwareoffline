@@ -336,6 +336,8 @@ export class App {
         h('span.push.text-xs', { text: u.role, style: { textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.7 } })
       ])) : [h('div.text-muted', { text: 'No users are configured. Open Settings to add one.' })]),
       footer: [
+        h('button.btn', { type: 'button', text: 'Sign out', style: { marginInlineEnd: 'auto' },
+          onclick: () => { dialog.close(); this.signOut(); } }),
         store.session.can('user.manage')
           ? h('button.btn', { type: 'button', text: 'Manage users', onclick: () => { dialog.close(); this.go('settings', { tab: 'users' }); } })
           : null,
@@ -345,22 +347,33 @@ export class App {
   }
 
   async signInAs(user) {
-    const pinned = user.pinHash && user.pinHash !== '';
-    if (!pinned) { this.store.signIn(user); this.afterSignIn(user); return; }
+    if (user.id === this.store.session.id) return;
 
     const { promptText } = await import('./feedback.js');
-    const pin = await promptText({
+    const password = await promptText({
       title: `Sign in as ${user.name}`,
-      label: 'PIN',
-      placeholder: '••••',
-      requiredMessage: 'Enter the PIN for this user.',
+      label: 'Password',
+      hint: user.username ? 'Username: ' + user.username : '',
+      requiredMessage: 'Enter this user\u2019s password.',
       confirmLabel: 'Sign in'
     });
-    if (pin === null) return;
-    const valid = await this.store.verifyPin(user, pin);
-    if (!valid) { toast('error', 'Incorrect PIN', 'That PIN does not match this user.'); return; }
+    if (password === null) return;
+
+    const valid = await this.store.verifyPassword(user, password);
+    if (!valid) { toast('error', 'Wrong password', 'That password does not match this user.'); return; }
+
+    if (user.mustChangePassword) {
+      toast('warn', 'Password change needed',
+        'This account still uses the default password. Sign out and back in to set a new one.');
+    }
     this.store.signIn(user);
     this.afterSignIn(user);
+  }
+
+  /** Signs out and returns to the sign-in screen. */
+  signOut() {
+    this.store.signOut();
+    window.location.reload();
   }
 
   afterSignIn(user) {

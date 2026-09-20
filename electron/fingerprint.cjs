@@ -76,9 +76,12 @@ function machineFingerprint() {
   return cached;
 }
 
-/** Four bytes of sha256 — the form stored inside a licence. */
-function machineHashBytes() {
-  return new Uint8Array(createHash('sha256').update(machineFingerprint(), 'utf8').digest().subarray(0, 4));
+/**
+ * The identifier stored against a licence in Firestore. Full sha256 of the
+ * fingerprint, so it reveals nothing about the machine itself.
+ */
+function machineId() {
+  return createHash('sha256').update(machineFingerprint(), 'utf8').digest('hex');
 }
 
 /** Short, readable code the customer reads out when asking for a bound licence. */
@@ -87,4 +90,4 @@ function machineCode() {
   return hex.replace(/(.{4})(?=.)/g, '$1-');
 }
 
-module.exports = { machineFingerprint, machineHashBytes, machineCode };
+module.exports = { machineFingerprint, machineId, machineCode };

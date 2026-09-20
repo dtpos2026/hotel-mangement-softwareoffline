@@ -12,13 +12,12 @@
     "dist:portable": "npm run build && electron-builder --win portable --x64",
     "dist:all": "npm run build && electron-builder --win --x64 --ia32",
     "pack": "npm run build && electron-builder --dir",
-    "licence": "node tools/license-manager/server.mjs",
-    "licence:keygen": "node tools/licence-cli.mjs keygen",
-    "licence:issue": "node tools/licence-cli.mjs issue",
-    "licence:list": "node tools/licence-cli.mjs list",
+    "licence": "echo \"The admin panel is now a web app. Run: npm run panel\"",
     "test": "node tests/run.js && node tests/print.test.js && node tests/licence.test.js && node tests/integration.test.js",
     "test:browser": "node tests/browser.test.mjs",
-    "serve": "npx http-server -p 8080 -c-1 ."
+    "serve": "npx http-server -p 8080 -c-1 .",
+    "panel": "npx http-server admin-panel -p 7788 -c-1 -o",
+    "deploy:panel": "firebase deploy --only hosting,firestore:rules"
   },
   "devDependencies": {
     "electron": "^44.4.3",

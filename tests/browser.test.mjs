@@ -27,6 +27,8 @@ const pageErrors = [];
 page.on('pageerror', e => pageErrors.push(e.message));
 page.on('console', m => { if (m.type() === 'error' && !/ERR_CERT|Failed to load resource/.test(m.text())) pageErrors.push(m.text()); });
 
+const TEST_PASSWORD = 'kalam2026';
+
 const toastText = () => page.evaluate(() =>
   Array.from(document.querySelectorAll('.toast')).map(t => t.innerText).join('\n'));
 const clearToasts = () => page.evaluate(() =>
@@ -39,6 +41,32 @@ suite('Boot and storage');
 await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
 
+// The app now opens on a sign-in screen; get through it first.
+suite('Sign-in gate');
+ok('the sign-in screen is shown', await page.locator('text=Sign in to continue').count() > 0);
+ok('the default credentials are hinted on a fresh install',
+  await page.locator('text=First time here?').count() > 0);
+
+await page.fill('[name="username"]', 'admin');
+await page.fill('#password', 'wrong-one');
+await page.click('#signin');
+await page.waitForTimeout(700);
+ok('a wrong password is refused', await page.locator('text=Wrong username or password').count() > 0);
+
+await page.fill('[name="username"]', 'admin');
+await page.fill('#password', '123');
+await page.click('#signin');
+await page.waitForTimeout(900);
+ok('the default password forces a change', await page.locator('text=Choose a new password').count() > 0);
+
+const pwFields = await page.locator('.card input[type=password]').all();
+await pwFields[0].fill(TEST_PASSWORD);
+await pwFields[1].fill(TEST_PASSWORD);
+await page.click('#save');
+await page.waitForTimeout(2000);
+await clearToasts();
+
+suite('Boot and storage');
 ok('the app booted', await page.evaluate(() => typeof window.__hms === 'object'));
 const storage = await page.evaluate(() => window.__hms.store.db.storageKind());
 ok('IndexedDB is the storage engine in a browser', storage === 'indexeddb', storage);
@@ -355,6 +383,13 @@ const beforeReload = await page.evaluate(() => {
 });
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(1500);
+ok('a reload returns to the sign-in screen', await page.locator('text=Sign in to continue').count() > 0);
+await page.fill('[name="username"]', 'admin');
+await page.fill('#password', TEST_PASSWORD);
+await page.click('#signin');
+await page.waitForTimeout(2000);
+await clearToasts();
+
 const afterReload = await page.evaluate(() => {
   const s = window.__hms.store;
   return { reservations: s.db.all('reservations').length, guests: s.db.live('guests').length,
@@ -411,7 +446,8 @@ const asReception = await page.evaluate(async () => {
   const s = window.__hms.store;
   const { newId } = await import('/src/core/ids.js');
   const user = { id: newId('u'), name: 'Test Reception', username: 'reception',
-                 role: 'receptionist', active: true, pinHash: '', salt: '', createdAt: new Date().toISOString(), archivedAt: null };
+                 role: 'receptionist', active: true, passwordHash: '', pinHash: '', salt: '',
+                 mustChangePassword: false, createdAt: new Date().toISOString(), archivedAt: null };
   await s.write('user.create', tx => tx.put('users', user));
   s.signIn(user);
   window.__hms.app.render();

@@ -6,7 +6,7 @@
 
 import { Database } from './db.js';
 import { COLLECTIONS, SCHEMA_VERSION, runMigrations, defaultProperty, defaultSettings, defaultCounters } from './schema.js';
-import { Session, hashPin, newSalt } from './auth.js';
+import { Session, hashPassword, verifyPassword, newSalt, DEFAULT_USERNAME, DEFAULT_PASSWORD } from './auth.js';
 import { newId } from './ids.js';
 import { setLanguage } from './i18n.js';
 import { nowIso, today } from './dates.js';
@@ -50,11 +50,14 @@ export class AppStore {
 
     let adminRecord = null;
     if (needUser) {
+      // The documented starting account. mustChangePassword makes the software
+      // insist on a new one at first sign-in, so no property is left running
+      // on a password that is printed in the manual.
       const salt = newSalt();
       adminRecord = {
-        id: newId('u'), name: 'Administrator', username: 'admin', role: 'admin',
-        salt, pinHash: await hashPin('1234', salt), active: true,
-        mustChangePin: true, createdAt: nowIso(), archivedAt: null
+        id: newId('u'), name: 'Administrator', username: DEFAULT_USERNAME, role: 'admin',
+        salt, passwordHash: await hashPassword(DEFAULT_PASSWORD, salt), active: true,
+        mustChangePassword: true, createdAt: nowIso(), archivedAt: null
       };
     }
 
@@ -167,10 +170,43 @@ export class AppStore {
     this._emit(new Set(['session']));
   }
 
-  async verifyPin(user, pin) {
+  /** Sign-in check. Accepts a record written under the older PIN field too. */
+  async verifyPassword(user, password) {
     if (!user || !user.active) return false;
-    const hash = await hashPin(pin, user.salt || '');
-    return hash === user.pinHash;
+    const stored = user.passwordHash || user.pinHash || '';
+    if (!stored) return false;
+    return verifyPassword(password, user.salt || '', stored);
+  }
+
+  /** Kept for older call sites. */
+  async verifyPin(user, pin) { return this.verifyPassword(user, pin); }
+
+  /** Finds a user by username, case-insensitively. */
+  findUser(username) {
+    const u = String(username || '').trim().toLowerCase();
+    if (!u) return null;
+    return this.db.live('users').find(x =>
+      String(x.username || '').toLowerCase() === u && x.active) || null;
+  }
+
+  /** Changes a password and clears the must-change flag. */
+  async setPassword(userId, password) {
+    const user = this.db.get('users', userId);
+    if (!user) throw new Error('User not found.');
+    const salt = newSalt();
+    const next = Object.assign({}, user, {
+      salt,
+      passwordHash: await hashPassword(password, salt),
+      pinHash: '',
+      mustChangePassword: false,
+      passwordChangedAt: nowIso()
+    });
+    await this.write('user.password', (tx, log) => {
+      tx.put('users', next);
+      log('users', userId, { name: user.name });
+    });
+    if (this.session.id === userId) this.session = new Session(next);
+    return next;
   }
 
   /* --- diagnostics --------------------------------------------------------- */

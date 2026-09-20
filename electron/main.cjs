@@ -19,8 +19,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 
-const { LicenceStore, TRIAL_DAYS } = require('./licence-store.cjs');
-const { machineCode, machineHashBytes } = require('./fingerprint.cjs');
+const { LicenceService } = require('./licence-service.cjs');
+const { machineCode, machineId } = require('./fingerprint.cjs');
 
 const APP_SCHEME = 'app';
 const ROOT = path.join(__dirname, '..');
@@ -30,8 +30,7 @@ const ROOT = path.join(__dirname, '..');
 const isDev = process.argv.includes('--dev');
 
 let mainWindow = null;
-let licenceStore = null;
-let licenceApi = null;      // the ESM licence module, imported once at startup
+let licence = null;         // LicenceService
 
 /* ------------------------------------------------------------- protocol */
 
@@ -231,100 +230,38 @@ function buildMenu() {
 
 /* -------------------------------------------------------------- licence */
 
-async function loadLicenceApi() {
-  // The licence format module is ESM and shared with the renderer, so it is
+async function loadLicence() {
+  // The licence model is ESM and shared with the admin panel, so it is
   // imported dynamically rather than required.
-  const url = pathToFileURL(path.join(ROOT, 'src', 'core', 'license.js')).toString();
-  licenceApi = await import(url);
-  let publicKey = '';
-  try {
-    const keyUrl = pathToFileURL(path.join(ROOT, 'src', 'core', 'license-key.js')).toString();
-    publicKey = (await import(keyUrl)).LICENCE_PUBLIC_KEY;
-  } catch {
-    console.warn('[licence] no verification key is built in; running in trial mode only.');
-  }
-  licenceStore = new LicenceStore(app.getPath('userData'), publicKey);
-  licenceStore.ensureFirstRun();
-}
+  const url = pathToFileURL(path.join(ROOT, 'src', 'core', 'licence-model.js')).toString();
+  const model = await import(url);
+  licence = new LicenceService(app.getPath('userData'), machineId(), machineCode(), model);
 
-/** The single source of truth the renderer asks for. */
-function licenceStatus() {
-  const machineHash = machineHashBytes();
-  const base = {
-    machineCode: machineCode(),
-    trialDays: TRIAL_DAYS,
-    trialDaysLeft: licenceStore.trialDaysLeft(),
-    activatedAt: licenceStore.activatedAt
-  };
-
-  if (!licenceStore.key) {
-    const left = licenceStore.trialDaysLeft();
-    return Object.assign(base, {
-      ok: left > 0,
-      status: left > 0 ? 'trial' : 'none',
-      licensed: false,
-      message: left > 0
-        ? `Trial — ${left} day(s) remaining.`
-        : 'The trial period has ended. Enter a licence key to continue.',
-      details: null
-    });
-  }
-
-  try {
-    const { payload, signature } = licenceApi.splitKey(licenceStore.key);
-    if (!licenceStore.verifySignature(payload, signature)) {
-      return Object.assign(base, {
-        ok: false, status: 'tampered', licensed: false,
-        message: 'This licence key is not valid for this software. Please check it with your supplier.',
-        details: null
-      });
-    }
-    const parsed = licenceApi.readPayload(payload);
-    const result = licenceApi.evaluate(parsed, { machineHash });
-    return Object.assign(base, {
-      ok: result.ok,
-      status: result.status,
-      licensed: result.ok,
-      message: result.message,
-      daysLeft: result.daysLeft,
-      expiringSoon: !!result.expiringSoon,
-      details: licenceApi.describe(parsed),
-      limits: { maxUnits: parsed.maxUnits, maxUsers: parsed.maxUsers },
-      features: parsed.features
-    });
-  } catch (err) {
-    return Object.assign(base, {
-      ok: false, status: 'malformed', licensed: false,
-      message: 'The stored licence key could not be read: ' + err.message,
-      details: null
-    });
-  }
+  // A quiet re-check in the background, so a revoked or renewed licence is
+  // picked up without anyone having to do anything. Never blocks startup.
+  setTimeout(() => {
+    licence.recheck(false)
+      .then(r => { if (r.changed) send('licence-changed', licence.status()); })
+      .catch(() => {});
+  }, 8000);
 }
 
 function registerIpc() {
-  ipcMain.handle('licence:status', () => licenceStatus());
+  ipcMain.handle('licence:status', () => licence.status());
 
-  ipcMain.handle('licence:activate', (_e, key) => {
-    try {
-      const { payload, signature } = licenceApi.splitKey(key);
-      if (!licenceStore.verifySignature(payload, signature)) {
-        return { ok: false, message: 'That licence key is not valid. Check it was copied in full, then contact your supplier.' };
-      }
-      const parsed = licenceApi.readPayload(payload);
-      const result = licenceApi.evaluate(parsed, { machineHash: machineHashBytes() });
-      if (!result.ok) return { ok: false, message: result.message };
-
-      licenceStore.save(key);
-      return { ok: true, message: 'Licence activated.', status: licenceStatus() };
-    } catch (err) {
-      return { ok: false, message: err.message };
-    }
+  ipcMain.handle('licence:activate', async (_e, key) => {
+    const result = await licence.activate(String(key || ''));
+    return result.ok
+      ? { ok: true, message: 'Licence activated.', status: licence.status() }
+      : { ok: false, status: result.status, offline: !!result.offline, message: result.message };
   });
 
-  ipcMain.handle('licence:deactivate', () => {
-    licenceStore.clear();
-    return { ok: true, status: licenceStatus() };
+  ipcMain.handle('licence:recheck', async () => {
+    await licence.recheck(true);
+    return licence.status();
   });
+
+  ipcMain.handle('licence:deactivate', () => licence.deactivate());
 
   ipcMain.handle('licence:machineCode', () => machineCode());
 
@@ -486,7 +423,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     registerAppProtocol();
-    await loadLicenceApi();
+    await loadLicence();
     registerIpc();
     createWindow();
 

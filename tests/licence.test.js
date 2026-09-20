@@ -1,172 +1,175 @@
 /**
- * Licence security properties.
+ * Licence model and the local cache.
  *
- * The point of a signed offline licence is that a customer who owns the
- * installer still cannot mint or extend one. These checks prove that: every
- * field is covered by the signature, a different keypair is rejected, and the
- * date, machine and version rules all hold.
+ * The cryptographic offline scheme was replaced by Firebase verification, so
+ * what matters now is: keys are well formed and forgiving to type, the record
+ * rules (revoked / expired / bound to another computer) are right, and the
+ * local cache cannot be copied to another machine or edited by hand.
  */
 
-import { suite, ok, eq, report } from './harness.js';
+import { installBrowserGlobals, suite, ok, eq, report } from './harness.js';
+installBrowserGlobals();
 
-const lic = await import('../src/core/license.js');
-const {
-  generateKeypair, signPayload, verifyPayload, customerHash, machineHash, shortHash
-} = await import('../tools/licence-crypto.mjs');
+const m = await import('../src/core/licence-model.js');
+const { LicenceStore } = await import('../electron/licence-store.cjs');
+const { toFirestore, fromFirestore } = await import('../electron/firebase-rest.cjs');
+const { mkdtempSync, rmSync, readFileSync, writeFileSync } = await import('node:fs');
+const { tmpdir } = await import('node:os');
+const { join } = await import('node:path');
 
-const vendor = generateKeypair();
-const attacker = generateKeypair();
+/* ------------------------------------------------------------------ keys */
 
-function issue(fields, keypair) {
-  const payload = lic.buildPayload(Object.assign({
-    plan: 'standard',
-    issuedDay: lic.todayDay(),
-    expiryDay: lic.todayDay() + 365,
-    maxUnits: 25, maxUsers: 5,
-    features: lic.PLAN_FEATURES.standard,
-    licenceNo: 1,
-    customerHash: customerHash('Kalam Continental'),
-    machineHash: new Uint8Array(4)
-  }, fields));
-  const signature = signPayload(payload, (keypair || vendor).privateKey);
-  return { payload, signature, key: lic.encodeKey(payload, signature) };
-}
+suite('Licence keys');
 
-function check(key, context, publicKey) {
-  const { payload, signature } = lic.splitKey(key);
-  if (!verifyPayload(payload, signature, publicKey || vendor.publicKey)) {
-    return { ok: false, status: lic.STATUS.TAMPERED };
-  }
-  return lic.evaluate(lic.readPayload(payload), context || {});
-}
+const key = m.generateKey();
+ok('a key has the expected shape', /^HR-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/.test(key), key);
+ok('a key is short enough to read out', key.length === 17, String(key.length));
+ok('a key avoids ambiguous characters', !/[ILOU]/.test(key.replace(/^HR/, '')));
+ok('a fresh key is well formed', m.isWellFormed(key));
 
-/* -------------------------------------------------------------- encoding */
+const keys = new Set();
+for (let i = 0; i < 5000; i++) keys.add(m.generateKey());
+eq('5000 generated keys are all distinct', keys.size, 5000);
 
-suite('Key encoding');
+eq('formatting round-trips', m.formatKey(m.normaliseKey(key)), key);
+eq('lower case input is accepted', m.formatKey(key.toLowerCase()), key);
+eq('spaces and missing dashes are forgiven', m.formatKey('hr ' + m.normaliseKey(key)), key);
+eq('a mis-read I becomes 1', m.normaliseKey('HR-I234-5678-9ABC'), '123456789ABC');
+eq('a mis-read O becomes 0', m.normaliseKey('HR-O234-5678-9ABC'), '023456789ABC');
+ok('a short key is rejected', !m.isWellFormed('HR-1234'));
+ok('an empty key is rejected', !m.isWellFormed(''));
+ok('a key with invalid characters is rejected', !m.isWellFormed('HR-!!!!-@@@@-####'));
+eq('the document id drops the prefix and dashes', m.keyToDocId(key), m.normaliseKey(key));
 
-const std = issue({});
-eq('a key is exactly 144 characters', std.key.length, 144);
-ok('a key uses only Crockford Base32', /^[0-9A-HJKMNP-TV-Z]+$/.test(std.key));
-ok('a key contains no ambiguous characters', !/[ILOU]/.test(std.key));
+/* --------------------------------------------------------------- records */
 
-const formatted = lic.formatKey(std.key);
-eq('a formatted key survives a round trip', lic.fromBase32(formatted).length, lic.KEY_BYTES);
-eq('formatting produces 6 readable lines', formatted.split('\n').length, 6);
-ok('a key pasted with stray spaces and newlines still parses',
-  lic.splitKey('  ' + formatted.replace(/-/g, ' ') + '\n\n').payload.length === lic.PAYLOAD_BYTES);
-ok('lower case input is accepted', lic.splitKey(std.key.toLowerCase()).payload.length === lic.PAYLOAD_BYTES);
+suite('What a licence record means');
 
-const parsed = lic.readPayload(std.payload);
-eq('the plan round-trips', parsed.plan, 'standard');
-eq('the unit limit round-trips', parsed.maxUnits, 25);
-eq('the user limit round-trips', parsed.maxUsers, 5);
-eq('the features round-trip', parsed.features.sort(), lic.PLAN_FEATURES.standard.slice().sort());
-eq('the licence number round-trips', parsed.licenceNo, 1);
-eq('the issue date round-trips', parsed.issuedAt, lic.dayToDate(lic.todayDay()));
-
-/* ------------------------------------------------------------- integrity */
-
-suite('A customer cannot forge or extend a licence');
-
-eq('a genuine key verifies', check(std.key).ok, true);
-
-// Flip each byte of the payload in turn: every field must be signed.
-let acceptedTampering = 0;
-for (let i = 0; i < lic.PAYLOAD_BYTES; i++) {
-  const bytes = lic.fromBase32(std.key);
-  bytes[i] ^= 0xFF;
-  const forged = lic.toBase32(bytes);
-  try { if (check(forged).ok) acceptedTampering++; } catch { /* malformed counts as rejected */ }
-}
-eq('changing any payload byte invalidates the key', acceptedTampering, 0);
-
-// The obvious attacks, spelled out.
-const extended = lic.buildPayload({
-  plan: 'lifetime', expiryDay: 0, maxUnits: 0, maxUsers: 0,
-  features: lic.FEATURES.map(f => f.key), licenceNo: 1,
-  customerHash: customerHash('Kalam Continental'), machineHash: new Uint8Array(4)
+const base = () => Object.assign(m.blankRecord(), {
+  key, businessName: 'Kalam Continental', ownerName: 'Imran Khan', phone: '0300-1234567',
+  plan: 'standard', issuedAt: m.todayStr(), expiresAt: m.addDaysStr(365),
+  maxUnits: 25, maxUsers: 5, features: m.PLAN_FEATURES.standard.slice()
 });
-const reusedSig = lic.encodeKey(extended, std.signature);
-eq('a payload upgraded to lifetime with the old signature is rejected', check(reusedSig).ok, false);
-eq('and it is reported as tampered', check(reusedSig).status, lic.STATUS.TAMPERED);
 
-const selfSigned = issue({ plan: 'lifetime', expiryDay: 0, maxUnits: 0 }, attacker);
-eq('a licence signed with another keypair is rejected', check(selfSigned.key).ok, false);
-ok('but that same licence verifies under its own key', check(selfSigned.key, {}, attacker.publicKey).ok);
+const THIS_PC = 'machine-aaaa';
+const OTHER_PC = 'machine-bbbb';
 
-const truncated = lic.toBase32(lic.fromBase32(std.key).slice(0, 80));
-let truncatedRejected = false;
-try { truncatedRejected = !check(truncated).ok; } catch { truncatedRejected = true; }
-ok('a truncated key is rejected', truncatedRejected);
+eq('a fresh licence is usable', m.evaluateRecord(base(), THIS_PC).ok, true);
+eq('a missing record is refused', m.evaluateRecord(null, THIS_PC).status, m.STATUS.NOT_FOUND);
+ok('the not-found message tells the user what to check',
+  /typed exactly/i.test(m.evaluateRecord(null, THIS_PC).message));
 
-let garbageRejected = false;
-try { garbageRejected = !check('HELLO-WORLD-THIS-IS-NOT-A-KEY').ok; } catch { garbageRejected = true; }
-ok('random text is rejected', garbageRejected);
+const revoked = Object.assign(base(), { revoked: true });
+eq('a revoked licence is refused', m.evaluateRecord(revoked, THIS_PC).status, m.STATUS.REVOKED);
 
-/* ------------------------------------------------------------- lifecycle */
+const expired = Object.assign(base(), { expiresAt: m.addDaysStr(-1) });
+eq('an expired licence is refused', m.evaluateRecord(expired, THIS_PC).status, m.STATUS.EXPIRED);
+ok('the expiry message names the date', m.evaluateRecord(expired, THIS_PC).message.includes(m.addDaysStr(-1)));
 
-suite('Expiry, machine binding and version');
+const lastDay = Object.assign(base(), { expiresAt: m.todayStr() });
+eq('a licence is still good on its final day', m.evaluateRecord(lastDay, THIS_PC).ok, true);
+eq('and it reports zero days left', m.evaluateRecord(lastDay, THIS_PC).daysLeft, 0);
 
-const expired = issue({ expiryDay: lic.todayDay() - 1 });
-eq('an expired licence is refused', check(expired.key).ok, false);
-eq('and it is reported as expired', check(expired.key).status, lic.STATUS.EXPIRED);
-ok('the expiry message names the date', /expired on \d{4}-\d{2}-\d{2}/.test(check(expired.key).message));
+const soon = Object.assign(base(), { expiresAt: m.addDaysStr(10) });
+ok('a licence expiring within two weeks is flagged', m.evaluateRecord(soon, THIS_PC).expiringSoon === true);
+ok('a licence with a year left is not flagged', m.evaluateRecord(base(), THIS_PC).expiringSoon === false);
 
-const lastDay = issue({ expiryDay: lic.todayDay() });
-eq('a licence is still valid on its final day', check(lastDay.key).ok, true);
-eq('and it reports zero days left', check(lastDay.key).daysLeft, 0);
+const perpetual = Object.assign(base(), { expiresAt: '', plan: 'lifetime' });
+eq('a licence with no expiry never expires', m.evaluateRecord(perpetual, THIS_PC).ok, true);
+eq('and it shows as Never', m.describeRecord(perpetual).expires, 'Never');
 
-const soon = issue({ expiryDay: lic.todayDay() + 7 });
-ok('a licence expiring within two weeks is flagged', check(soon.key).expiringSoon === true);
-ok('a licence expiring in a year is not flagged', check(std.key).expiringSoon === false);
+const unbound = base();
+ok('an unactivated licence reports first activation', m.evaluateRecord(unbound, THIS_PC).firstActivation === true);
 
-const perpetual = issue({ plan: 'lifetime', expiryDay: 0 });
-eq('a perpetual licence never expires', check(perpetual.key, { today: lic.todayDay() + 40000 }).ok, true);
-eq('and it says so', lic.describe(lic.readPayload(perpetual.payload)).expires, 'Never');
+const bound = Object.assign(base(), { machineId: THIS_PC });
+eq('a bound licence works on its own computer', m.evaluateRecord(bound, THIS_PC).ok, true);
+ok('and it is no longer a first activation', m.evaluateRecord(bound, THIS_PC).firstActivation === false);
+eq('a bound licence is refused elsewhere', m.evaluateRecord(bound, OTHER_PC).status, m.STATUS.WRONG_MACHINE);
+ok('the wrong-computer message offers a way out',
+  /contact your supplier/i.test(m.evaluateRecord(bound, OTHER_PC).message));
 
-const thisPc = machineHash('MACHINE-GUID-AAAA');
-const otherPc = machineHash('MACHINE-GUID-BBBB');
-const bound = issue({ machineHash: thisPc });
-eq('a bound licence works on its own machine', check(bound.key, { machineHash: thisPc }).ok, true);
-eq('a bound licence is refused on another machine', check(bound.key, { machineHash: otherPc }).ok, false);
-eq('and it says which problem it is', check(bound.key, { machineHash: otherPc }).status, lic.STATUS.WRONG_MACHINE);
-eq('an unbound licence works anywhere', check(std.key, { machineHash: otherPc }).ok, true);
-ok('binding is visible when inspecting', lic.readPayload(bound.payload).machineBound === true);
-ok('an unbound licence reports no binding', lic.readPayload(std.payload).machineBound === false);
+suite('What the licence screen shows');
+const shown = m.describeRecord(base());
+eq('the business name is carried', shown.businessName, 'Kalam Continental');
+eq('the owner name is carried', shown.ownerName, 'Imran Khan');
+eq('the phone is carried', shown.phone, '0300-1234567');
+eq('the plan is shown by label', shown.plan, 'Standard');
+eq('unit limits are shown', shown.units, '25');
+eq('zero units reads as unlimited', m.describeRecord(Object.assign(base(), { maxUnits: 0 })).units, 'Unlimited');
+ok('features are shown as readable labels', shown.featureLabels.includes('Reports and CSV export'));
 
-const future = issue({});
-future.payload[0] = 9;
-const futureKey = lic.encodeKey(future.payload, signPayload(future.payload, vendor.privateKey));
-eq('a licence from a newer format is refused politely', check(futureKey).status, lic.STATUS.FUTURE_VERSION);
-
-/* --------------------------------------------------------------- plans */
-
-suite('Plans and limits');
-
-for (const plan of lic.PLANS) {
-  const p = issue({ plan: plan.key, maxUnits: plan.maxUnits, maxUsers: plan.maxUsers,
-                    features: lic.PLAN_FEATURES[plan.key] || [], expiryDay: plan.days ? lic.todayDay() + plan.days : 0 });
-  const parsedPlan = lic.readPayload(p.payload);
-  eq(`${plan.label} round-trips`, parsedPlan.plan, plan.key);
-  eq(`${plan.label} keeps its unit limit`, parsedPlan.maxUnits, plan.maxUnits);
-  ok(`${plan.label} verifies`, check(p.key).ok);
+for (const plan of m.PLANS) {
+  const r = Object.assign(base(), { plan: plan.key, features: m.PLAN_FEATURES[plan.key] });
+  eq(`${plan.label} describes correctly`, m.describeRecord(r).plan, plan.label);
 }
 
-const unlimited = lic.describe(lic.readPayload(issue({ maxUnits: 0, maxUsers: 0 }).payload));
-eq('zero units reads as unlimited', unlimited.units, 'Unlimited');
-eq('zero users reads as unlimited', unlimited.users, 'Unlimited');
+/* ------------------------------------------------------------ local cache */
 
-const everyFeature = issue({ features: lic.FEATURES.map(f => f.key) });
-eq('all 12 feature bits survive the round trip',
-  lic.readPayload(everyFeature.payload).features.length, lic.FEATURES.length);
-const noFeature = issue({ features: [] });
-eq('an empty feature set round-trips', lic.readPayload(noFeature.payload).features.length, 0);
+suite('The local cache cannot be moved or edited');
 
-suite('Customer identity');
-eq('customer hashing ignores case and punctuation',
-  Array.from(customerHash('Kalam Continental')).join(),
-  Array.from(customerHash('  kalam,  CONTINENTAL ')).join());
-ok('different customers hash differently',
-  Array.from(customerHash('Kalam Continental')).join() !== Array.from(customerHash('Swat Resort')).join());
+const dir = mkdtempSync(join(tmpdir(), 'hr-lic-'));
+const record = base();
+
+const store = new LicenceStore(dir, THIS_PC);
+eq('a new install has no licence', store.activated, false);
+ok('first run is stamped', !!store.ensureFirstRun());
+
+store.save(key, record);
+eq('after activation it is licensed', store.activated, true);
+eq('the record is kept', store.record.businessName, 'Kalam Continental');
+
+const reopened = new LicenceStore(dir, THIS_PC);
+eq('the licence survives a restart', reopened.activated, true);
+eq('and keeps its business name', reopened.record.businessName, 'Kalam Continental');
+
+const onOtherPc = new LicenceStore(dir, OTHER_PC);
+eq('the cache is refused on another computer', onOtherPc.activated, false);
+eq('and that is reported as tampering', onOtherPc.tampered, true);
+
+// Hand-edit the expiry, the obvious attack.
+const file = join(dir, 'licence.json');
+const raw = JSON.parse(readFileSync(file, 'utf8'));
+raw.payload.record.expiresAt = '2099-12-31';
+writeFileSync(file, JSON.stringify(raw));
+const edited = new LicenceStore(dir, THIS_PC);
+eq('an edited cache is refused', edited.activated, false);
+eq('and it is reported as tampering', edited.tampered, true);
+
+// Removing the HMAC entirely should not help either.
+writeFileSync(file, JSON.stringify({ payload: raw.payload }));
+eq('a cache with no signature is refused', new LicenceStore(dir, THIS_PC).activated, false);
+
+// Deactivation clears it.
+const clean = new LicenceStore(dir, THIS_PC);
+clean.save(key, record);
+clean.clear();
+eq('deactivation removes the licence', clean.activated, false);
+ok('but the first-run stamp is kept', !!clean.state.firstRunAt);
+
+suite('Re-check timing');
+const fresh = new LicenceStore(dir, THIS_PC);
+fresh.save(key, record);
+eq('a just-activated licence needs no re-check', fresh.shouldRecheck(), false);
+eq('and is well inside the grace period', fresh.pastGrace(), false);
+fresh.state.lastVerifiedAt = new Date(Date.now() - 9 * 86400000).toISOString();
+eq('after nine days a re-check is due', fresh.shouldRecheck(), true);
+eq('but it still works offline', fresh.pastGrace(), false);
+fresh.state.lastVerifiedAt = new Date(Date.now() - 60 * 86400000).toISOString();
+eq('after sixty days offline a re-check is required', fresh.pastGrace(), true);
+
+rmSync(dir, { recursive: true, force: true });
+
+/* ------------------------------------------------------- Firestore values */
+
+suite('Firestore value conversion');
+const sample = {
+  key, businessName: 'Kalam Continental', maxUnits: 25, revoked: false,
+  features: ['reports', 'expenses'], nested: { a: 1, b: 'two' }
+};
+eq('values survive a round trip', fromFirestore(toFirestore(sample)), sample);
+eq('an integer stays an integer', fromFirestore(toFirestore({ n: 42 })).n, 42);
+eq('a boolean stays a boolean', fromFirestore(toFirestore({ b: false })).b, false);
+eq('an empty array survives', fromFirestore(toFirestore({ a: [] })).a, []);
+eq('null survives', fromFirestore(toFirestore({ v: null })).v, null);
 
 process.exit(report() === 0 ? 0 : 1);

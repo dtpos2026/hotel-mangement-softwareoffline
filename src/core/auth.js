@@ -65,21 +65,82 @@ export function roleLabel(role) {
 }
 
 /**
- * PIN hashing. This is an offline device-local product with no network attack
- * surface, but a PIN should still not sit in the database as plain text.
- * SHA-256 over PIN + per-user salt, via WebCrypto, with a small synchronous
- * fallback for file:// contexts where crypto.subtle is not exposed.
+ * Password hashing.
+ *
+ * This is a device-local product with no network attack surface, but a
+ * password must still not sit in the database as plain text — staff reuse
+ * passwords, and a stolen laptop should not hand them over.
+ *
+ * PBKDF2-SHA256 with a per-user salt, through WebCrypto. The iteration count
+ * is high enough to make a stolen database tedious to attack and low enough
+ * that signing in stays instant on the low-end machines these properties run.
+ * A small synchronous fallback covers contexts where crypto.subtle is absent.
  */
-export async function hashPin(pin, salt) {
-  const text = String(salt || '') + ':' + String(pin || '');
+const PBKDF2_ITERATIONS = 150000;
+
+export async function hashPassword(password, salt) {
+  const text = String(password || '');
+  const saltText = String(salt || '');
+
   if (typeof crypto !== 'undefined' && crypto.subtle && typeof TextEncoder !== 'undefined') {
     try {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey('raw', enc.encode(text), 'PBKDF2', false, ['deriveBits']);
+      const bits = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', salt: enc.encode(saltText), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+        key, 256);
+      return 'pbkdf2$' + PBKDF2_ITERATIONS + '$' +
+        Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
     } catch { /* falls through */ }
   }
-  return 'fnv:' + fnv1a(text);
+  return 'fnv:' + fnv1a(saltText + ':' + text);
 }
+
+/**
+ * Verifies a password against a stored hash, re-deriving with whatever scheme
+ * the hash was written by, so an older record still signs in.
+ */
+export async function verifyPassword(password, salt, stored) {
+  if (!stored) return false;
+  if (stored.startsWith('pbkdf2$')) {
+    const parts = stored.split('$');
+    const iterations = Number(parts[1]) || PBKDF2_ITERATIONS;
+    if (typeof crypto !== 'undefined' && crypto.subtle && typeof TextEncoder !== 'undefined') {
+      try {
+        const enc = new TextEncoder();
+        const key = await crypto.subtle.importKey('raw', enc.encode(String(password || '')), 'PBKDF2', false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits(
+          { name: 'PBKDF2', salt: enc.encode(String(salt || '')), iterations, hash: 'SHA-256' }, key, 256);
+        const hex = Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+        return timingSafeEqual('pbkdf2$' + iterations + '$' + hex, stored);
+      } catch { return false; }
+    }
+    return false;
+  }
+  // Legacy SHA-256 and fallback hashes.
+  const legacy = await hashPassword(password, salt);
+  if (timingSafeEqual(legacy, stored)) return true;
+  if (typeof crypto !== 'undefined' && crypto.subtle && typeof TextEncoder !== 'undefined') {
+    try {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(salt || '') + ':' + String(password || '')));
+      const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      return timingSafeEqual(hex, stored);
+    } catch { /* nothing more to try */ }
+  }
+  return false;
+}
+
+/** Constant-time string compare, so a wrong password reveals nothing by timing. */
+function timingSafeEqual(a, b) {
+  const sa = String(a), sb = String(b);
+  if (sa.length !== sb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < sa.length; i++) diff |= sa.charCodeAt(i) ^ sb.charCodeAt(i);
+  return diff === 0;
+}
+
+/** Kept so existing callers and stored PINs keep working. */
+export const hashPin = hashPassword;
 
 function fnv1a(str) {
   let h = 0x811c9dc5;
@@ -91,6 +152,26 @@ function fnv1a(str) {
 }
 
 export function newSalt() { return newId('s').slice(-12); }
+
+/** The default the software ships with, which must be changed on first use. */
+export const DEFAULT_USERNAME = 'admin';
+export const DEFAULT_PASSWORD = '123';
+
+/**
+ * Password rules. Deliberately mild: this is a reception desk, not a bank, and
+ * a rule staff cannot satisfy just becomes a sticky note on the monitor.
+ */
+export function checkPassword(password, username) {
+  const p = String(password || '');
+  // The default is checked first: it is shorter than the minimum, and being
+  // told "too short" when the real problem is "that is the printed default"
+  // sends people straight back to typing it again.
+  if (p === DEFAULT_PASSWORD) return 'That is the password the software ships with. Please choose your own.';
+  if (p.length < 4) return 'Password must be at least 4 characters.';
+  if (p.length > 64) return 'Password must be 64 characters or fewer.';
+  if (username && p.toLowerCase() === String(username).toLowerCase()) return 'The password must not be the same as the username.';
+  return null;
+}
 
 export class Session {
   constructor(user) {

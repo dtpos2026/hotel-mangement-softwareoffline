@@ -7,7 +7,7 @@ import { h, mount, qs, formValues, busy, readImage } from '../dom.js';
 import { card, dataTable, emptyState, pageHead, field, checkbox, segmented, badge, alert, kpi, railRows } from '../components.js';
 import { modal, confirm, promptText, toast, ok as toastOk, info, warn, fail } from '../feedback.js';
 import { PROPERTY_TYPES } from '../../core/schema.js';
-import { ROLES, roleLabel, hashPin, newSalt, permissionsFor, PERMISSIONS } from '../../core/auth.js';
+import { ROLES, roleLabel, hashPassword, newSalt, permissionsFor, PERMISSIONS, checkPassword } from '../../core/auth.js';
 import { buildBackup, backupFilename, validateBackup, restoreBackup, readAutoBackups, saveAutoBackup, downloadFile, readFileAsText } from '../../core/backup.js';
 import { formatDateTime, nowIso } from '../../core/dates.js';
 import { newId } from '../../core/ids.js';
@@ -395,8 +395,21 @@ function usersTab(ctx) {
   const canManage = store.session.can('user.manage');
   const users = store.db.all('users').filter(u => !u.archivedAt);
 
+  const me = store.db.get('users', store.session.id);
+
   return h('div.stack', [
-    !canManage ? alert('info', 'Read-only', 'Only an admin can add or change users.') : null,
+    (me && me.mustChangePassword) ? alert('warn', 'You are still using the default password',
+      'Anyone who has seen the manual knows it. Change it now.') : null,
+
+    card({ title: 'Your account' }, h('div.row', [
+      h('div', [
+        h('div.strong', { text: store.session.name }),
+        h('div.text-sm.text-muted', { text: `${me ? me.username : ''} · ${roleLabel(store.session.role)}` })
+      ]),
+      h('button.btn.push', { type: 'button', text: 'Change my password', onclick: () => changeOwnPassword(ctx) })
+    ])),
+
+    !canManage ? alert('info', 'Read-only', 'Only an admin can add or change other users.') : null,
 
     card({ title: 'Users', note: `${users.length}`, flush: true,
       tools: canManage ? [h('button.btn.btn--sm.btn--primary', { type: 'button', text: 'Add user',
@@ -408,12 +421,15 @@ function usersTab(ctx) {
               h('div.text-xs.text-muted', { text: u.username || '' })
             ]) },
           { key: 'role', label: 'Role', render: u => badge(roleLabel(u.role), u.role === 'admin' ? 'accent' : 'muted') },
-          { key: 'pin', label: 'PIN', render: u => u.pinHash ? badge('Set', 'ok') : badge('None', 'warn') },
+          { key: 'pw', label: 'Password', render: u => u.mustChangePassword
+              ? badge('Default — must change', 'warn')
+              : (u.passwordHash || u.pinHash) ? badge('Set', 'ok') : badge('None', 'due') },
           { key: 'perms', label: 'Permissions', render: u => h('span.text-sm.text-muted', {
               text: `${permissionsFor(u.role).size} of ${PERMISSIONS.length}` }) },
           { key: 'active', label: 'Status', render: u => u.active ? badge('Active', 'ok') : badge('Disabled', 'muted') },
           { key: 'act', label: '', render: u => canManage ? h('div.row.row--tight', [
               h('button.btn.btn--sm', { type: 'button', text: 'Edit', onclick: () => userForm(ctx, u) }),
+              h('button.btn.btn--sm', { type: 'button', text: 'Reset password', onclick: () => resetPassword(ctx, u) }),
               u.id !== store.session.id
                 ? h('button.btn.btn--sm.btn--ghost', { type: 'button', text: u.active ? 'Disable' : 'Enable',
                     onclick: () => toggleUser(ctx, u) })
@@ -470,8 +486,8 @@ function userForm(ctx, user) {
       field({ label: 'Username', name: 'username', value: user ? user.username : '', placeholder: 'imran' }),
       field({ label: 'Role', name: 'role', type: 'select', value: user ? user.role : 'receptionist',
         options: ROLES.map(r => ({ value: r.id, label: r.label })) }),
-      field({ label: user ? 'New PIN (leave blank to keep)' : 'PIN', name: 'pin', type: 'password',
-        placeholder: '4–6 digits', hint: 'Used when switching user.' })
+      field({ label: user ? 'New password (leave blank to keep)' : 'Password', name: 'password', type: 'password',
+        placeholder: 'At least 4 characters', hint: 'Used to sign in.' })
     ]),
     user ? checkbox({ label: 'Active', name: 'active', value: user.active }) : null
   ]);
@@ -487,19 +503,36 @@ function userForm(ctx, user) {
           if (!String(v.name || '').trim()) { toast('warn', 'Name is required'); return; }
           try {
             store.session.require('user.manage');
-            let pinHash = user ? user.pinHash : '';
+            const username = String(v.username || '').trim();
+            if (!username) { toast('warn', 'A username is required', 'This is what they type to sign in.'); return; }
+
+            const clash = store.db.live('users').find(x =>
+              x.id !== (user ? user.id : '') &&
+              String(x.username || '').toLowerCase() === username.toLowerCase());
+            if (clash) { toast('warn', 'That username is already taken', 'Choose a different one.'); return; }
+
+            let passwordHash = user ? (user.passwordHash || '') : '';
             let salt = user ? user.salt : newSalt();
-            if (v.pin) {
-              if (!/^\d{4,6}$/.test(v.pin)) { toast('warn', 'PIN must be 4 to 6 digits'); return; }
+            let mustChange = user ? !!user.mustChangePassword : false;
+
+            if (v.password) {
+              const problem = checkPassword(v.password, username);
+              if (problem) { toast('warn', 'Choose a different password', problem); return; }
               salt = newSalt();
-              pinHash = await hashPin(v.pin, salt);
+              passwordHash = await hashPassword(v.password, salt);
+              mustChange = false;
+            } else if (!user) {
+              toast('warn', 'Set a password', 'A new user needs a password to sign in.');
+              return;
             }
+
             const record = Object.assign({}, user || {}, {
               id: user ? user.id : newId('u'),
               name: String(v.name).trim(),
-              username: String(v.username || '').trim(),
+              username,
               role: v.role,
-              salt, pinHash,
+              salt, passwordHash, pinHash: '',
+              mustChangePassword: mustChange,
               active: user ? !!v.active : true,
               archivedAt: null,
               createdAt: user ? user.createdAt : nowIso()
@@ -516,6 +549,63 @@ function userForm(ctx, user) {
     ]
   });
   return dialog;
+}
+
+/** An admin resetting someone else's password. */
+async function resetPassword(ctx, user) {
+  const { store, app } = ctx;
+  const next = await promptText({
+    title: `Reset the password for ${user.name}?`,
+    label: 'New password',
+    hint: 'Tell them this password; they can change it themselves afterwards.',
+    placeholder: 'At least 4 characters',
+    confirmLabel: 'Set password'
+  });
+  if (next === null) return;
+  const problem = checkPassword(next, user.username);
+  if (problem) { toast('warn', 'Choose a different password', problem); return; }
+  try {
+    store.session.require('user.manage');
+    await store.setPassword(user.id, next);
+    toastOk('Password reset', `${user.name} can now sign in with the new password.`);
+    app.refresh();
+  } catch (err) { fail(err); }
+}
+
+/** Anyone changing their own password. */
+function changeOwnPassword(ctx) {
+  const { store } = ctx;
+  const current = h('input.input', { type: 'password', autocomplete: 'current-password', autofocus: true });
+  const next = h('input.input', { type: 'password', autocomplete: 'new-password' });
+  const again = h('input.input', { type: 'password', autocomplete: 'new-password' });
+
+  const dialog = modal({
+    title: 'Change your password',
+    body: h('div.stack', [
+      h('div.field', [h('label.field__label', { text: 'Current password' }), current]),
+      h('div.field', [h('label.field__label', { text: 'New password' }), next]),
+      h('div.field', [h('label.field__label', { text: 'Repeat new password' }), again])
+    ]),
+    footer: [
+      h('button.btn', { type: 'button', text: 'Cancel', onclick: () => dialog.close() }),
+      h('button.btn.btn--primary', { type: 'button', text: 'Change password',
+        onclick: e => busy(e.currentTarget, async () => {
+          const me = store.db.get('users', store.session.id);
+          if (!me) { toast('error', 'Not signed in'); return; }
+          if (!await store.verifyPassword(me, current.value)) {
+            toast('warn', 'Current password is wrong'); current.focus(); return;
+          }
+          const problem = checkPassword(next.value, me.username);
+          if (problem) { toast('warn', 'Choose a different password', problem); next.focus(); return; }
+          if (next.value !== again.value) { toast('warn', 'The two passwords do not match'); again.focus(); return; }
+          try {
+            await store.setPassword(me.id, next.value);
+            toastOk('Password changed');
+            dialog.close();
+          } catch (err) { fail(err); }
+        }) })
+    ]
+  });
 }
 
 async function toggleUser(ctx, user) {

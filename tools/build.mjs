@@ -33,43 +33,35 @@ const step = (label, fn) => {
 
 console.log('\nPreparing the build\n');
 
-/* --- the verification key must be present and real ---------------------- */
+/* --- the licence server must be configured ------------------------------ */
 
-step('Licence verification key is built in', () => {
-  const keyFile = join(ROOT, 'src', 'core', 'license-key.js');
-  if (!existsSync(keyFile)) {
-    throw new Error(
-      'src/core/license-key.js is missing, so the installer could not verify any licence.\n' +
-      '    Run this once, then build again:  npm run licence:keygen');
+step('Licence server is configured', () => {
+  const file = join(ROOT, 'electron', 'firebase-config.cjs');
+  if (!existsSync(file)) {
+    throw new Error('electron/firebase-config.cjs is missing, so no installed copy could verify a licence.');
   }
-  const text = readFileSync(keyFile, 'utf8');
-  const m = /LICENCE_PUBLIC_KEY\s*=\s*'([^']+)'/.exec(text);
-  if (!m) throw new Error('license-key.js does not contain a key. Re-run: npm run licence:keygen');
-  const raw = Buffer.from(m[1], 'base64');
-  if (raw.length !== 32) throw new Error(`The public key should be 32 bytes and this one is ${raw.length}.`);
-  return m[1].slice(0, 12) + '…';
+  const text = readFileSync(file, 'utf8');
+  const apiKey = /apiKey:\s*'([^']+)'/.exec(text);
+  const project = /projectId:\s*'([^']+)'/.exec(text);
+  if (!apiKey || !apiKey[1] || apiKey[1].includes('YOUR_')) {
+    throw new Error('No Firebase apiKey in electron/firebase-config.cjs.');
+  }
+  if (!project || !project[1] || project[1].includes('YOUR_')) {
+    throw new Error('No Firebase projectId in electron/firebase-config.cjs.');
+  }
+  return project[1];
 });
 
-/* --- the private key must NOT be anywhere the packager will look -------- */
+/* --- the admin panel must never reach a customer ------------------------ */
 
-step('Private signing key is excluded from the package', () => {
+step('Admin panel is excluded from the installer', () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
-  const files = pkg.build && pkg.build.files ? pkg.build.files : [];
-  const included = files.filter(f => !f.startsWith('!'));
-  // A pattern is only dangerous if it names vendor/tools directly, or if it is
-  // rooted at the project top with a wildcard. A directory-scoped pattern such
-  // as "src/**/*" cannot reach vendor/.
-  const risky = included.filter(f => /(^|\/)(vendor|tools)(\/|$)/.test(f) || /^\*/.test(f));
+  const included = (pkg.build && pkg.build.files ? pkg.build.files : []).filter(f => !f.startsWith('!'));
+  // A directory-scoped pattern such as "src/**/*" cannot reach admin-panel/;
+  // only a top-level wildcard or a direct mention can.
+  const risky = included.filter(f => /(^|\/)(admin-panel|tools|vendor)(\/|$)/.test(f) || /^\*/.test(f));
   if (risky.length) {
-    throw new Error(
-      'These patterns in package.json "build.files" could sweep in vendor/ (which holds the\n' +
-      '    private signing key): ' + risky.join(', '));
-  }
-  if (existsSync(join(ROOT, 'vendor'))) {
-    const gitignore = existsSync(join(ROOT, '.gitignore')) ? readFileSync(join(ROOT, '.gitignore'), 'utf8') : '';
-    if (!/^vendor\/?$/m.test(gitignore)) {
-      throw new Error('vendor/ exists but is not in .gitignore — the private key could be committed.');
-    }
+    throw new Error('These patterns in package.json "build.files" would ship the admin panel: ' + risky.join(', '));
   }
   return included.length + ' whitelisted paths';
 });
@@ -79,7 +71,8 @@ step('Private signing key is excluded from the package', () => {
 step('Application entry points exist', () => {
   const required = [
     'index.html', 'src/main.js', 'styles/app.css',
-    'electron/main.cjs', 'electron/preload.cjs',
+    'electron/main.cjs', 'electron/preload.cjs', 'electron/firebase-config.cjs',
+    'electron/licence-service.cjs', 'src/core/licence-model.js',
     'assets/brand-digital-target.jpg', 'build/icon.png'
   ];
   const missing = required.filter(f => !existsSync(join(ROOT, f)));
@@ -100,9 +93,9 @@ if (process.argv.includes('--skip-tests')) {
   console.log(`  ${dim('•')} ${dim('Tests skipped (--skip-tests)')}`);
 } else {
   step('Test suite passes', () => {
-    execSync('node tests/run.js && node tests/print.test.js && node tests/licence.test.js && node tests/integration.test.js',
+    execSync('node tests/run.js && node tests/print.test.js && node tests/integration.test.js',
       { cwd: ROOT, stdio: 'pipe' });
-    return 'domain, print, licence, integration';
+    return 'domain, print, integration';
   });
 }
 

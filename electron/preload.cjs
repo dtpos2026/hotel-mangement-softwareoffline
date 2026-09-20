@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('hostApi', {
   licence: {
     status: () => ipcRenderer.invoke('licence:status'),
     activate: (key) => ipcRenderer.invoke('licence:activate', String(key || '')),
+    recheck: () => ipcRenderer.invoke('licence:recheck'),
     deactivate: () => ipcRenderer.invoke('licence:deactivate'),
     machineCode: () => ipcRenderer.invoke('licence:machineCode')
   },
@@ -43,6 +44,15 @@ contextBridge.exposeInMainWorld('hostApi', {
     open: (opts) => ipcRenderer.invoke('file:open', opts),
     autoBackup: (opts) => ipcRenderer.invoke('file:autoBackup', opts),
     revealBackups: () => ipcRenderer.invoke('file:revealBackups')
+  },
+
+  /** Fires when a background re-check changes the licence state. */
+  onLicenceChanged: (handler) => {
+    const listener = (_event, status) => {
+      try { handler(status); } catch (err) { console.error('[licence]', err); }
+    };
+    ipcRenderer.on('licence-changed', listener);
+    return () => ipcRenderer.removeListener('licence-changed', listener);
   },
 
   /** Native menu items route here; returns an unsubscribe function. */
