@@ -14,6 +14,7 @@ import { formatMoney } from '../../core/money.js';
 import { formatDate, formatDateTime, today } from '../../core/dates.js';
 import { PAYMENT_METHODS } from '../../core/schema.js';
 import { printPaymentReceipt } from '../print-actions.js';
+import { sendDialog } from '../whatsapp.js';
 
 const state = { preset: 'today', from: today(), to: today(), method: '', kind: '', showVoided: false };
 
@@ -101,6 +102,10 @@ export function render(ctx) {
             moneyText(p.kind === 'refund' ? -p.amount : p.amount, currency, p.kind === 'refund' ? 'due' : 'ok') },
         { key: 'act', label: '', render: p => h('div.row.row--tight', [
             h('button.btn.btn--sm', { type: 'button', text: 'Receipt', onclick: () => printPaymentReceipt(store, p) }),
+            (!p.voided && (store.db.get('guests', p.guestId) || {}).phone)
+              ? h('button.btn.btn--sm', { type: 'button', text: 'WhatsApp',
+                  onclick: () => sendDialog(ctx, { payment: p, template: 'payment' }) })
+              : null,
             (!p.voided && store.session.can('payment.void'))
               ? h('button.btn.btn--sm.btn--ghost', { type: 'button', text: 'Void',
                   onclick: async () => {

@@ -144,6 +144,44 @@ export async function revealBackupFolder() {
   return api.file.revealBackups();
 }
 
+/* -------------------------------------------------------------- WhatsApp */
+
+export async function whatsappStatus() {
+  if (!isDesktop || !api.whatsapp) {
+    return { state: 'unavailable', linked: false, qr: '', me: null,
+      lastError: 'WhatsApp is only available in the installed desktop application.',
+      usage: { lastHour: 0, lastDay: 0, total: 0, hourlyCap: 0, dailyCap: 0 } };
+  }
+  return api.whatsapp.status();
+}
+
+export async function whatsappConnect() {
+  if (!isDesktop || !api.whatsapp) return whatsappStatus();
+  return api.whatsapp.connect();
+}
+
+export async function whatsappDisconnect() {
+  if (!isDesktop || !api.whatsapp) return whatsappStatus();
+  return api.whatsapp.disconnect();
+}
+
+export async function whatsappUnlink() {
+  if (!isDesktop || !api.whatsapp) return whatsappStatus();
+  return api.whatsapp.unlink();
+}
+
+export async function whatsappSend(phone, text, countryCode) {
+  if (!isDesktop || !api.whatsapp) {
+    return { ok: false, message: 'WhatsApp sending is only available in the installed desktop application.' };
+  }
+  return api.whatsapp.send({ phone, text, countryCode });
+}
+
+export function onWhatsappStatus(handler) {
+  if (!isDesktop || !api.whatsapp || !api.whatsapp.onStatus) return () => {};
+  return api.whatsapp.onStatus(handler);
+}
+
 /* ------------------------------------------------------------------ menu */
 
 export function onMenu(handler) {

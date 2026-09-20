@@ -15,6 +15,7 @@ import { printTestPage } from '../print-actions.js';
 import { printerSettings, contentWidthMm } from '../../print/printer.js';
 import * as host from '../../core/host.js';
 import { activationCard } from './activation.js';
+import { whatsappPanel } from '../whatsapp.js';
 
 const TABS = [
   { id: 'property', label: 'Property' },
@@ -22,6 +23,7 @@ const TABS = [
   { id: 'booking', label: 'Booking rules' },
   { id: 'users', label: 'Users & roles' },
   { id: 'backup', label: 'Backup & restore' },
+  { id: 'whatsapp', label: 'WhatsApp' },
   { id: 'licence', label: 'Licence' },
   { id: 'about', label: 'About & data' }
 ];
@@ -34,7 +36,8 @@ export function render(ctx) {
 
   const body = {
     property: propertyTab, printing: printingTab, booking: bookingTab,
-    users: usersTab, backup: backupTab, licence: licenceTab, about: aboutTab
+    users: usersTab, backup: backupTab, whatsapp: whatsappTab,
+    licence: licenceTab, about: aboutTab
   }[state.tab] || propertyTab;
 
   return [
@@ -797,6 +800,10 @@ function startRestoreFromText(ctx, text, filename) {
   });
   return dialog;
 }
+
+/* --------------------------------------------------------------- whatsapp */
+
+function whatsappTab(ctx) { return whatsappPanel(ctx); }
 
 /* ---------------------------------------------------------------- licence */
 

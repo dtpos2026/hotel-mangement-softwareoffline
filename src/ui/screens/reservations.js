@@ -19,6 +19,7 @@ import { formatMoney, toMoney } from '../../core/money.js';
 import { today, addDays, formatDate, formatDateTime, nightsBetween } from '../../core/dates.js';
 import { BOOKING_SOURCES, PAYMENT_METHODS, RESERVATION_STATUS } from '../../core/schema.js';
 import { printBill, printRegistrationCard } from '../print-actions.js';
+import { sendDialog } from '../whatsapp.js';
 
 const state = { status: '', from: '', to: '', q: '' };
 
@@ -535,6 +536,13 @@ export function bookingDetail(ctx, reservation) {
             onclick: () => printBill(store, r) }),
           h('button.btn.btn--block', { type: 'button', text: 'Print registration card (A4)',
             onclick: () => printRegistrationCard(store, r) }),
+          (guest && guest.phone) ? h('button.btn.btn--block', {
+            type: 'button', text: 'Send on WhatsApp',
+            onclick: () => sendDialog(ctx, { reservation: r, guest,
+              template: r.status === 'reserved' ? 'booking'
+                : r.status === 'checked_out' ? 'checkout'
+                : folioApi.billFor(store, r).balance > 0 ? 'balance' : 'checkin' })
+          }) : null,
           r.status === 'reserved' && store.session.can('reservation.cancel')
             ? h('button.btn.btn--block', { type: 'button', text: 'Mark no-show',
                 onclick: async () => {

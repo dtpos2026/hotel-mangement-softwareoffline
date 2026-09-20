@@ -46,6 +46,25 @@ contextBridge.exposeInMainWorld('hostApi', {
     revealBackups: () => ipcRenderer.invoke('file:revealBackups')
   },
 
+  whatsapp: {
+    status: () => ipcRenderer.invoke('whatsapp:status'),
+    connect: () => ipcRenderer.invoke('whatsapp:connect'),
+    disconnect: () => ipcRenderer.invoke('whatsapp:disconnect'),
+    unlink: () => ipcRenderer.invoke('whatsapp:unlink'),
+    send: (payload) => ipcRenderer.invoke('whatsapp:send', {
+      phone: String(payload && payload.phone || ''),
+      text: String(payload && payload.text || ''),
+      countryCode: payload && payload.countryCode ? String(payload.countryCode) : '92'
+    }),
+    onStatus: (handler) => {
+      const listener = (_event, status) => {
+        try { handler(status); } catch (err) { console.error('[whatsapp]', err); }
+      };
+      ipcRenderer.on('whatsapp-status', listener);
+      return () => ipcRenderer.removeListener('whatsapp-status', listener);
+    }
+  },
+
   /** Fires when a background re-check changes the licence state. */
   onLicenceChanged: (handler) => {
     const listener = (_event, status) => {

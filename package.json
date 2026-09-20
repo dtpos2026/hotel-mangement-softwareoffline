@@ -13,7 +13,7 @@
     "dist:all": "npm run build && electron-builder --win --x64 --ia32",
     "pack": "npm run build && electron-builder --dir",
     "licence": "echo \"The admin panel is now a web app. Run: npm run panel\"",
-    "test": "node tests/run.js && node tests/print.test.js && node tests/licence.test.js && node tests/integration.test.js",
+    "test": "node tests/run.js && node tests/print.test.js && node tests/licence.test.js && node tests/messaging.test.js && node tests/integration.test.js",
     "test:browser": "node tests/browser.test.mjs",
     "serve": "npx http-server -p 8080 -c-1 .",
     "panel": "npx http-server admin-panel -p 7788 -c-1 -o",
@@ -98,5 +98,14 @@
       "icon": "build/icon.png",
       "category": "public.app-category.business"
     }
+  },
+  "dependencies": {
+    "baileys": "^6.17.16",
+    "qrcode": "^1.5.4"
+  },
+  "overrides": {
+    "music-metadata": "^11.15.0",
+    "file-type": "^21.3.1",
+    "uuid": "^11.1.1"
   }
 }

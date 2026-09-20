@@ -10,7 +10,6 @@
  */
 
 import { _electron as electron } from '/opt/node22/lib/node_modules/playwright/index.mjs';
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,6 +22,10 @@ const ok = (label, cond, detail) => {
   else { failed++; failures.push(suiteName + ' › ' + label + (detail ? ' (' + detail + ')' : ''));
     console.log('  \x1b[31m✗ ' + label + '\x1b[0m' + (detail ? '  \x1b[2m' + detail + '\x1b[0m' : '')); }
 };
+const eq = (label, actual, expected, detail) => {
+  const same = JSON.stringify(actual) === JSON.stringify(expected);
+  ok(label, same, same ? detail : `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+};
 
 const userData = mkdtempSync(join(tmpdir(), 'hr-electron-'));
 
@@ -30,7 +33,7 @@ const userData = mkdtempSync(join(tmpdir(), 'hr-electron-'));
 const electronBinary = join(process.cwd(), 'node_modules', 'electron', 'dist',
   process.platform === 'win32' ? 'electron.exe' : 'electron');
 
-const app = await electron.launch({
+let app = await electron.launch({
   executablePath: existsSync(electronBinary) ? electronBinary : undefined,
   args: ['.', '--no-sandbox', '--disable-gpu', `--user-data-dir=${userData}`],
   cwd: process.cwd(),
@@ -49,7 +52,7 @@ async function appWindow() {
 }
 
 await app.firstWindow();
-const page = await appWindow();
+let page = await appWindow();
 const pageErrors = [];
 page.on('pageerror', e => pageErrors.push(e.message));
 page.on('console', m => { if (m.type() === 'error') pageErrors.push(m.text()); });
@@ -87,84 +90,124 @@ ok('process is not exposed', sandbox.process === 'undefined');
 ok('ipcRenderer is not exposed', sandbox.ipcRenderer === 'undefined');
 ok('only the hostApi bridge is exposed', sandbox.hostApi === 'object');
 ok('the bridge surface is exactly what is intended',
-  sandbox.hostKeys.join(',') === 'app,file,isDesktop,licence,onMenu,print', sandbox.hostKeys.join(','));
+  sandbox.hostKeys.join(',') === 'app,file,isDesktop,licence,onLicenceChanged,onMenu,print,whatsapp', sandbox.hostKeys.join(','));
 
 /* ------------------------------------------------------------------ boot */
 
-suite('The application boots on the desktop');
-const booted = await page.evaluate(() => {
-  const gate = document.body.innerText.includes('Activate this copy');
-  return {
-    hasApp: typeof window.__hms === 'object',
-    gate,
-    storage: window.__hms ? window.__hms.store.db.storageKind() : null,
-    degraded: window.__hms ? window.__hms.store.db.degraded : null
-  };
-});
-ok('the licence gate did not block a fresh trial', booted.gate === false);
-ok('the app booted', booted.hasApp === true);
-ok('IndexedDB is the storage engine', booted.storage === 'indexeddb', String(booted.storage));
-ok('storage is not in the degraded fallback', booted.degraded === false);
-
 /* --------------------------------------------------------------- licence */
 
-suite('Licence checks run in the main process');
+suite('Licence gate');
 
-const trial = await page.evaluate(() => window.hostApi.licence.status());
-ok('a fresh install starts in trial', trial.status === 'trial', trial.status);
-ok('the trial has days remaining', trial.trialDaysLeft > 0 && trial.trialDaysLeft <= 14, String(trial.trialDaysLeft));
-ok('the trial is usable', trial.ok === true);
-ok('a machine code is offered for binding', /^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/.test(trial.machineCode), trial.machineCode);
+const fresh = await page.evaluate(() => window.hostApi.licence.status());
+eq('a fresh install is not licensed', fresh.licensed, false);
+eq('and it says so plainly', fresh.status, 'none');
+ok('the activation screen is shown', await page.locator('text=Activate your software').count() > 0);
+ok('a machine code is offered', /^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/.test(fresh.machineCode), fresh.machineCode);
 
-// A structurally perfect key, signed by a keypair that is not the vendor's.
-// This is the attack that matters: someone who reads the format out of the
-// installer and mints their own licences.
-const forged = await (async () => {
-  const lic = await import('../src/core/license.js');
-  const { generateKeypair, signPayload, customerHash } = await import('../tools/licence-crypto.mjs');
-  const rogue = generateKeypair();
-  const payload = lic.buildPayload({
-    plan: 'lifetime', issuedDay: lic.todayDay(), expiryDay: 0,
-    maxUnits: 0, maxUsers: 0, features: lic.FEATURES.map(f => f.key),
-    licenceNo: 99999, customerHash: customerHash('Pirate Hotel'), machineHash: new Uint8Array(4)
-  });
-  return lic.encodeKey(payload, signPayload(payload, rogue.privateKey));
-})();
-ok('the forged key is well formed', forged.length === 144, String(forged.length));
+// Malformed keys are caught locally, with no network involved.
+const malformed = await page.evaluate(() => window.hostApi.licence.activate('NOT-A-KEY'));
+eq('a malformed key is refused without touching the network', malformed.ok, false);
+eq('and it is reported as malformed', malformed.status, 'malformed');
+ok('the message shows the expected shape', /HR-/.test(malformed.message), malformed.message);
 
-const bogus = await page.evaluate(k => window.hostApi.licence.activate(k), forged);
-ok('a key signed by someone else is refused', bogus.ok === false, bogus.message);
-ok('and the refusal is in plain words', /not valid/i.test(bogus.message || ''), bogus.message);
+const short = await page.evaluate(() => window.hostApi.licence.activate('HR-1234'));
+eq('a short key is refused', short.ok, false);
 
-const stillTrial = await page.evaluate(() => window.hostApi.licence.status());
-ok('the forged key was not stored', stillTrial.status === 'trial');
+// A well-formed key with no internet must say exactly that, not fail silently.
+const wellFormed = await page.evaluate(() => window.hostApi.licence.activate('HR-4F2K-9XQP-7M3A'));
+eq('a well-formed key gets past the format check', wellFormed.status !== 'malformed', true, wellFormed.status);
+if (wellFormed.offline) {
+  ok('with no internet the message says so', /internet/i.test(wellFormed.message), wellFormed.message);
+  ok('and it explains this is only needed once', /once|after activation/i.test(wellFormed.message));
+} else {
+  ok('an unknown key is refused by the server', wellFormed.ok === false, wellFormed.message);
+}
 
-const garbage = await page.evaluate(() => window.hostApi.licence.activate('NOT-A-REAL-KEY'));
-ok('nonsense is refused', garbage.ok === false);
+suite('The licence cache is honoured');
 
-// Issue a genuine key against the real vendor keypair and activate it.
-const genuine = execFileSync('node', ['tools/licence-cli.mjs', 'issue',
-  '--customer', 'Electron Test Property', '--plan', 'professional', '--days', '400'],
-  { encoding: 'utf8' });
-const key = (genuine.match(/^[0-9A-HJKMNP-TV-Z-]{20,}$/gm) || []).join('').replace(/-/g, '');
-ok('the CLI issued a key of the right length', key.length === 144, String(key.length));
+// Write a valid cache the way the app would, then restart and confirm the app
+// opens. This is test setup, not a product path: it needs the machine secret.
+const { LicenceStore } = await import('../electron/licence-store.cjs');
+const { machineId } = await import('../electron/fingerprint.cjs');
+const seeded = new LicenceStore(userData, machineId());
+seeded.save('HR-TEST-TEST-TEST', {
+  key: 'HR-TEST-TEST-TEST', businessName: 'Electron Test Property',
+  ownerName: 'Test Owner', phone: '0300-1234567',
+  plan: 'professional', issuedAt: new Date().toISOString().slice(0, 10),
+  expiresAt: '', maxUnits: 100, maxUsers: 15,
+  features: ['reports', 'expenses', 'housekeeping', 'dayClose', 'backupRestore', 'userManagement', 'advancedReports'],
+  revoked: false, machineId: machineId()
+});
+ok('a cache was written for the test', seeded.activated);
 
-const activated = await page.evaluate(k => window.hostApi.licence.activate(k), key);
-ok('a genuine key activates', activated.ok === true, activated.message);
-ok('and the status becomes licensed', activated.status && activated.status.licensed === true);
-ok('the plan is read back correctly', activated.status.details.plan === 'Professional', activated.status && activated.status.details && activated.status.details.plan);
-ok('the unit limit is read back', activated.status.details.units === '100', activated.status.details.units);
-ok('features are read back', Array.isArray(activated.status.features) && activated.status.features.includes('advancedReports'));
+await app.close();
+const app2 = await electron.launch({
+  executablePath: existsSync(electronBinary) ? electronBinary : undefined,
+  args: ['.', '--no-sandbox', '--disable-gpu', `--user-data-dir=${userData}`],
+  cwd: process.cwd(),
+  env: Object.assign({}, process.env, { ELECTRON_DISABLE_SECURITY_WARNINGS: '1' })
+});
+await app2.firstWindow();
+let page2 = null;
+for (let i = 0; i < 40; i++) {
+  page2 = app2.windows().find(w => w.url().startsWith('app://'));
+  if (page2) break;
+  await new Promise(r => setTimeout(r, 250));
+}
+await page2.waitForTimeout(2500);
 
-const persisted = await page.evaluate(() => window.hostApi.licence.status());
-ok('the licence persists in userData', persisted.licensed === true);
-ok('a licence file was written', existsSync(join(userData, 'licence.json')) || true);
+const licensed = await page2.evaluate(() => window.hostApi.licence.status());
+eq('a cached licence opens the software', licensed.licensed, true);
+eq('the business name is read back', licensed.details.businessName, 'Electron Test Property');
+eq('the owner name is read back', licensed.details.ownerName, 'Test Owner');
+eq('the phone is read back', licensed.details.phone, '0300-1234567');
+eq('the plan is read back', licensed.details.plan, 'Professional');
+eq('the unit limit is read back', licensed.details.units, '100');
+ok('features are read back', Array.isArray(licensed.features) && licensed.features.includes('advancedReports'));
+ok('the sign-in screen follows activation', await page2.locator('text=Sign in to continue').count() > 0);
+ok('the default credentials are hinted', await page2.locator('text=First time here?').count() > 0);
 
-const removed = await page.evaluate(() => window.hostApi.licence.deactivate());
-ok('a licence can be removed', removed.status.licensed === false);
-ok('removing it falls back to the trial', removed.status.status === 'trial');
+// Sign in, so the rest of the checks run against the real app.
+await page2.fill('[name="username"]', 'admin');
+await page2.fill('#password', '123');
+await page2.click('#signin');
+await page2.waitForTimeout(900);
+ok('the default password forces a change', await page2.locator('text=Choose a new password').count() > 0);
+const pw = await page2.locator('.card input[type=password]').all();
+await pw[0].fill('kalam2026');
+await pw[1].fill('kalam2026');
+await page2.click('#save');
+await page2.waitForTimeout(2200);
+ok('the app opens once the password is set', (await page2.evaluate(() => typeof window.__hms)) === 'object');
+
+const removed = await page2.evaluate(() => window.hostApi.licence.deactivate());
+eq('a licence can be removed', removed.licensed, false);
+
+// Everything below runs against the second instance.
+page = page2;
+app = app2;
+
+suite('WhatsApp bridge');
+const wa = await page.evaluate(() => window.hostApi.whatsapp.status());
+ok('the WhatsApp status is readable', typeof wa.state === 'string', wa.state);
+eq('it starts unlinked', wa.linked, false);
+ok('sending caps are published', wa.usage && wa.usage.hourlyCap > 0 && wa.usage.dailyCap > 0,
+  JSON.stringify(wa.usage));
+const waSend = await page.evaluate(() => window.hostApi.whatsapp.send({ phone: '0300-1234567', text: 'hi' }));
+eq('sending while unlinked is refused', waSend.ok, false);
+ok('and it says how to link', /Settings|scan|QR/i.test(waSend.message), waSend.message);
+const waBad = await page.evaluate(() => window.hostApi.whatsapp.send({ phone: 'abc', text: 'hi' }));
+eq('a bad number is refused', waBad.ok, false);
 
 /* -------------------------------------------------------------- printing */
+
+suite('Storage on the desktop');
+const booted = await page.evaluate(() => ({
+  storage: window.__hms ? window.__hms.store.db.storageKind() : null,
+  degraded: window.__hms ? window.__hms.store.db.degraded : null
+}));
+eq('IndexedDB is the storage engine', booted.storage, 'indexeddb');
+eq('storage is not in the degraded fallback', booted.degraded, false);
 
 suite('Printing through the desktop bridge');
 const printers = await page.evaluate(() => window.hostApi.print.printers());

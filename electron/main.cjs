@@ -20,6 +20,7 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 
 const { LicenceService } = require('./licence-service.cjs');
+const { WhatsAppService } = require('./whatsapp.cjs');
 const { machineCode, machineId } = require('./fingerprint.cjs');
 
 const APP_SCHEME = 'app';
@@ -31,6 +32,7 @@ const isDev = process.argv.includes('--dev');
 
 let mainWindow = null;
 let licence = null;         // LicenceService
+let whatsapp = null;        // WhatsAppService, started on demand
 
 /* ------------------------------------------------------------- protocol */
 
@@ -265,6 +267,27 @@ function registerIpc() {
 
   ipcMain.handle('licence:machineCode', () => machineCode());
 
+  /* --- WhatsApp ---------------------------------------------------------- */
+
+  // Started lazily: a property that never uses WhatsApp should never pay the
+  // memory or the socket for it.
+  function whatsappService() {
+    if (!whatsapp) {
+      whatsapp = new WhatsAppService(app.getPath('userData'));
+      whatsapp.on('status', status => send('whatsapp-status', status));
+    }
+    return whatsapp;
+  }
+
+  ipcMain.handle('whatsapp:status', () => whatsappService().status());
+  ipcMain.handle('whatsapp:connect', () => whatsappService().connect());
+  ipcMain.handle('whatsapp:disconnect', () => whatsappService().disconnect());
+  ipcMain.handle('whatsapp:unlink', () => whatsappService().unlink());
+  ipcMain.handle('whatsapp:send', (_e, payload) => {
+    const o = payload || {};
+    return whatsappService().send(o.phone, o.text, { countryCode: o.countryCode });
+  });
+
   /* --- printing ---------------------------------------------------------- */
 
   ipcMain.handle('print:printers', async () => {
@@ -430,6 +453,10 @@ if (!app.requestSingleInstanceLock()) {
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
+  });
+
+  app.on('before-quit', () => {
+    if (whatsapp) whatsapp.disconnect().catch(() => {});
   });
 
   app.on('window-all-closed', () => {
