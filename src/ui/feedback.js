@@ -6,7 +6,7 @@
  * anything destructive.
  */
 
-import { h, mount, clear, qs, busy } from './dom.js';
+import { h, mount, qs, busy } from './dom.js';
 
 let toastHost = null;
 

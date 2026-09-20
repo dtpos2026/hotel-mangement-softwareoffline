@@ -1,0 +1,153 @@
+# Hotel Register — Offline Accommodation Management
+
+An offline management system for hotels, guest houses, resorts, apartments,
+villas, cottages and shared beds. Everything runs in the browser on one
+computer: no server, no account, no internet, no build step and no dependencies.
+
+Built for Pakistani properties — CNIC handling, Easypaisa and JazzCash, the
+statutory guest register (روزنامچہ), 80mm thermal receipts and a bilingual
+English/Urdu interface.
+
+---
+
+## Running it
+
+Double-clicking `index.html` works, but the browser then blocks IndexedDB and
+the app falls back to smaller browser storage. **Serve the folder instead** —
+it takes one command and gives you the full local database:
+
+```bash
+npx http-server -p 8080 .        # then open http://127.0.0.1:8080
+# or
+python3 -m http.server 8080
+```
+
+The title bar tells you which storage engine is in use; Settings › About
+states it in full and warns when the fallback is active.
+
+First launch asks for the property name and type, and offers sample data so
+every screen has something in it. The sample data can be erased at any time
+from Settings › About.
+
+The default user is **Administrator** with PIN **1234** — change it in
+Settings › Users.
+
+## Keyboard
+
+| Key | Action |
+|-----|--------|
+| `F2` | Check in |
+| `F4` | Check out |
+| `F8` | Guest register |
+| `F9` | Availability calendar |
+| `Ctrl/⌘ K` or `/` | Global search |
+
+## Printing
+
+**80mm thermal.** Settings › Receipt & printer controls paper width, all four
+margins independently, font size and logo size, with a live diagram of the
+print area. Defaults are 80mm paper with equal 4mm side margins, giving a 72mm
+print area — the width an 80mm head actually images, centred on the roll.
+
+*Compact mode* prints the same content about 35% shorter for properties that
+want to save paper. It stays at 10pt and uses no dotted or hairline text.
+
+Use **Test print** after any change: it prints a ruler with edge arrows, so
+clipping is obvious at a glance.
+
+In the browser's print dialog set **Margins: None**, **Headers and footers:
+off**, **Scale: 100%**. Set the thermal printer as the system default for
+one-click printing — browsers cannot choose a printer for you, which is why
+the printer name field here is only a note for staff.
+
+**A4.** Invoices, registration cards, day-close reports and all thirteen
+reports. Reports are paginated in code, so "Page 2 of 5", the column header and
+the property masthead repeat properly on every sheet.
+
+## Backup
+
+Everything lives on this one computer. **Download a backup at the end of each
+day** from Settings › Backup & restore and keep it somewhere else.
+
+A restore validates the whole file before writing anything, takes a copy of the
+current data first, and downloads that copy as a precaution. A bad file changes
+nothing. A local safety copy is also taken automatically once a day, but it
+lives in the browser and will not survive a reinstall — the downloaded file is
+the one that matters.
+
+## What it does
+
+Property profile · unit types · units with rates, capacity and amenities ·
+guests with stay history and duplicate protection · reservations with hard
+double-booking prevention · availability calendar · one-page walk-in check-in ·
+folio and extra charges · append-only payment ledger · check-out with
+settlement · housekeeping lifecycle · maintenance blocks · expenses · thirteen
+reports with CSV export · daily closing that locks its figures · five roles
+with an explicit permission set · English/Urdu.
+
+## Architecture
+
+```
+index.html          the whole app; ES modules, no bundler
+styles/app.css      design tokens and components
+src/core/           storage, schema, money, dates, validation, auth, i18n, backup
+src/domain/         business logic — no DOM, independently testable
+src/ui/             shell, components, screens
+src/print/          80mm and A4 renderers
+tests/              404 automated checks
+```
+
+Three rules hold the product together:
+
+1. **UI never touches storage.** UI → domain service → repository → database.
+   This is what lets a cloud-sync module be added later beside the domain layer
+   rather than through it.
+2. **Money is integer rupees.** No floating point anywhere in the financial
+   path.
+3. **History is immutable.** A reservation freezes its rate at creation, an
+   invoice freezes its lines at check-out, payments are append-only with voids,
+   and a closed day locks the receipts inside it. Changing a price today cannot
+   alter what an old invoice says.
+
+`docs/AUDIT.md` records what the original prototype was and why the runtime
+was replaced while the design was kept.
+
+## Tests
+
+```bash
+npm test                                  # 333 checks, no browser needed
+npx http-server -p 8765 -s . &            # then, for the browser suite:
+node tests/browser.test.mjs               # 71 checks in real Chromium
+```
+
+- `tests/run.js` — the 29-point acceptance checklist against the domain layer.
+- `tests/print.test.js` — every required receipt and invoice field, the 80mm
+  geometry maths, compact-mode savings, pagination, HTML escaping.
+- `tests/integration.test.js` — the demo seed end to end, all reports, the
+  whole UI module graph, reload safety.
+- `tests/browser.test.mjs` — real Chromium: IndexedDB, the booking form
+  refusing a clash, a walk-in, the print pipeline, check-out with a balance,
+  the Urdu switch, backup/restore, role permissions.
+
+The Node suites deliberately run on the localStorage adapter — the one that
+ships for `file://` use — while the browser suite covers IndexedDB.
+
+## Offline and fonts
+
+No network request is required. `index.html` links Google Fonts as a pure
+enhancement: online it loads the typefaces the design was drawn with, offline
+the link fails silently and the local stacks take over. The Urdu stack names
+the Nastaliq fonts actually installed on Pakistani Windows machines, starting
+with Jameel Noori Nastaleeq, so Urdu keeps proper Nastaliq shaping with no
+internet. See `docs/FONTS.md` to pin the typography completely offline.
+
+## Not included, by design
+
+No online booking, cloud sync, OTA integration, customer portal or online
+payments. The architecture keeps room for them — the domain layer has no UI
+and no storage assumptions — but none of it is built, and nothing offline
+depends on it.
+
+---
+
+Software by **Digital Target**.

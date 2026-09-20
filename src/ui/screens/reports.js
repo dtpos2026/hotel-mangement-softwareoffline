@@ -4,12 +4,12 @@
  */
 
 import { h } from '../dom.js';
-import { card, dataTable, emptyState, pageHead, kpi, filterBar, rangePicker, segmented, moneyText } from '../components.js';
-import { toast, ok as toastOk, fail } from '../feedback.js';
+import { card, dataTable, emptyState, pageHead, filterBar, rangePicker } from '../components.js';
+import { ok as toastOk, fail } from '../feedback.js';
 import { REPORTS, buildReport } from '../../domain/reports.js';
 import { toCsv, downloadFile } from '../../core/backup.js';
 import { formatMoney } from '../../core/money.js';
-import { presetRange, formatDate, today } from '../../core/dates.js';
+import { presetRange, formatDate } from '../../core/dates.js';
 import { printReport } from '../print-actions.js';
 
 const state = { report: 'occupancy', preset: 'month', from: presetRange('month').from, to: presetRange('month').to };

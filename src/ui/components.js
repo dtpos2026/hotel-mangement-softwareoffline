@@ -210,6 +210,9 @@ export function dataTable(opts) {
   };
 
   const isNum = col => col.align === 'end' || col.format === 'money' || col.format === 'percent';
+  // A date broken over three lines is unreadable, and it happens as soon as a
+  // wide table is squeezed — which the 16-column register always is.
+  const isAtomic = col => col.format === 'date' || col.format === 'datetime' || isNum(col);
 
   const body = rows.length
     ? rows.map((row, i) => h('tr', {
@@ -217,7 +220,7 @@ export function dataTable(opts) {
         style: opts.onRowClick ? { cursor: 'pointer' } : null,
         onclick: opts.onRowClick ? (e) => { if (!e.target.closest('button,a,input,select')) opts.onRowClick(row, i); } : null
       }, columns.map(col => h('td', {
-        class: [isNum(col) ? 'num' : '', col.class || ''].filter(Boolean).join(' ') || null,
+        class: [isNum(col) ? 'num' : '', isAtomic(col) ? 'nowrap' : '', col.class || ''].filter(Boolean).join(' ') || null,
         style: col.width ? { width: col.width } : null
       }, cellContent(col, row)))))
     : [h('tr', h('td', { colspan: columns.length, style: { padding: 0, border: 0 } },
@@ -291,7 +294,6 @@ export function rangePicker(opts) {
 /* ------------------------------------------------------------- misc bits */
 
 export function statusStrip(items, onSelect) {
-  const total = items.reduce((s, i) => s + i.count, 0) || 1;
   return h('div', [
     h('div.statusbar', items.filter(i => i.count > 0).map(i =>
       h('div.statusbar__seg', { style: { flex: String(i.count), background: i.color }, title: `${i.label}: ${i.count}` }))),

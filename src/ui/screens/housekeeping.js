@@ -6,12 +6,11 @@
  */
 
 import { h } from '../dom.js';
-import { card, dataTable, emptyState, pageHead, hkBadge, unitBadge, badge, kpi,
-         filterBar, filterSelect, segmented, alert } from '../components.js';
-import { confirm, toast, ok as toastOk, fail } from '../feedback.js';
+import { card, dataTable, emptyState, pageHead, hkBadge, unitBadge, badge, kpi, filterBar, filterSelect, segmented } from '../components.js';
+import { confirm, ok as toastOk, fail } from '../feedback.js';
 import { maintenanceForm } from '../forms.js';
 import * as hkApi from '../../domain/housekeeping.js';
-import { listUnits, unitTypeName, floorsOf, countByHkStatus } from '../../domain/units.js';
+import { unitTypeName, floorsOf, countByHkStatus } from '../../domain/units.js';
 import { HK_STATUS } from '../../core/schema.js';
 import { formatDate, formatDateTime, today } from '../../core/dates.js';
 import { printReport } from '../print-actions.js';
@@ -108,7 +107,6 @@ export function render(ctx) {
 }
 
 function boardView(ctx, rows) {
-  const { store } = ctx;
   const groups = [
     { id: 'dirty', label: 'Needs cleaning' },
     { id: 'cleaning', label: 'Being cleaned' },

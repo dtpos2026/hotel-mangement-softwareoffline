@@ -2,18 +2,16 @@
  * Guest directory and guest history (requirement 12).
  */
 
-import { h, mount } from '../dom.js';
-import { card, dataTable, emptyState, pageHead, badge, moneyText, railRows,
-         filterBar, filterSelect, reservationBadge } from '../components.js';
-import { modal, confirm, toast, ok as toastOk, fail } from '../feedback.js';
+import { h } from '../dom.js';
+import { card, dataTable, emptyState, pageHead, badge, moneyText, railRows, filterBar, filterSelect, reservationBadge } from '../components.js';
+import { modal, confirm, ok as toastOk, fail } from '../feedback.js';
 import { guestForm } from '../forms.js';
 import * as guestsApi from '../../domain/guests.js';
 import { unitLabel } from '../../domain/units.js';
 import { billFor } from '../../domain/folio.js';
 import { formatMoney } from '../../core/money.js';
-import { formatDate, formatDateTime } from '../../core/dates.js';
+import { formatDate } from '../../core/dates.js';
 import { GUEST_TYPES, PAYMENT_METHODS } from '../../core/schema.js';
-import { maskCnic } from '../../core/validate.js';
 import { bookingDetail } from './reservations.js';
 
 const state = { q: '', type: '', showArchived: false };

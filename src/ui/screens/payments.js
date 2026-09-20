@@ -5,13 +5,13 @@
 
 import { h } from '../dom.js';
 import { card, dataTable, emptyState, pageHead, badge, moneyText, filterBar, filterSelect, rangePicker, kpi } from '../components.js';
-import { confirm, promptText, toast, ok as toastOk, fail } from '../feedback.js';
+import { promptText, ok as toastOk, fail } from '../feedback.js';
 import { paymentForm } from '../forms.js';
 import * as paymentsApi from '../../domain/payments.js';
 import { unitLabel } from '../../domain/units.js';
 import { toCsv, downloadFile } from '../../core/backup.js';
 import { formatMoney } from '../../core/money.js';
-import { presetRange, formatDate, formatDateTime, today } from '../../core/dates.js';
+import { formatDate, formatDateTime, today } from '../../core/dates.js';
 import { PAYMENT_METHODS } from '../../core/schema.js';
 import { printPaymentReceipt } from '../print-actions.js';
 

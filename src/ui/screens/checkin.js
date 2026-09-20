@@ -10,21 +10,20 @@
  */
 
 import { h, mount, qs, busy } from '../dom.js';
-import { card, dataTable, emptyState, pageHead, field, chipGroup, alert, totalsRail,
-         reservationBadge, moneyText, badge, conflictList } from '../components.js';
-import { toast, ok as toastOk, fail, confirm, modal } from '../feedback.js';
-import { guestPicker, guestForm } from '../forms.js';
+import { card, dataTable, pageHead, field, chipGroup, alert, totalsRail, conflictList } from '../components.js';
+import { toast, ok as toastOk, fail, modal } from '../feedback.js';
+import { guestPicker } from '../forms.js';
 import * as reservationsApi from '../../domain/reservations.js';
 import * as staysApi from '../../domain/stays.js';
 import * as unitsApi from '../../domain/units.js';
 import * as guestsApi from '../../domain/guests.js';
 import * as folioApi from '../../domain/folio.js';
 import { quote } from '../../domain/pricing.js';
-import { formatMoney, toMoney } from '../../core/money.js';
+import { formatMoney } from '../../core/money.js';
 import { today, addDays, formatDate, nightsBetween } from '../../core/dates.js';
 import { formatCnic, formatPhone } from '../../core/validate.js';
 import { BOOKING_SOURCES, PAYMENT_METHODS } from '../../core/schema.js';
-import { printCheckInSlip, printPaymentReceipt } from '../print-actions.js';
+import { printCheckInSlip } from '../print-actions.js';
 
 export function render(ctx) {
   const { store, app, params } = ctx;

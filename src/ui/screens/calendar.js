@@ -6,11 +6,11 @@
  * that unit and date, which is how reception actually works from a wall chart.
  */
 
-import { h, mount } from '../dom.js';
-import { card, pageHead, filterBar, filterSelect, segmented, emptyState, badge } from '../components.js';
+import { h } from '../dom.js';
+import { card, pageHead, filterBar, filterSelect, segmented, emptyState } from '../components.js';
 import { availabilityGrid } from '../../domain/reservations.js';
 import { listUnitTypes, listUnits } from '../../domain/units.js';
-import { today, addDays, startOfWeek, startOfMonth, endOfMonth, monthLabel, formatDate, parseDate, isWeekend, MONTHS, DAYS } from '../../core/dates.js';
+import { today, addDays, startOfWeek, startOfMonth, endOfMonth, formatDate, parseDate, isWeekend, DAYS } from '../../core/dates.js';
 import { bookingForm } from './reservations.js';
 
 const state = { anchor: today(), span: 'month', typeId: '', unitId: '' };

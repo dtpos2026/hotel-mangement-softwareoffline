@@ -3,13 +3,13 @@
  */
 
 import { h } from '../dom.js';
-import { card, dataTable, emptyState, pageHead, moneyText, badge, filterBar, filterSelect } from '../components.js';
+import { card, dataTable, emptyState, pageHead, moneyText, filterBar, filterSelect } from '../components.js';
 import { chargeForm, paymentForm } from '../forms.js';
 import { inHouse } from '../../domain/reservations.js';
-import { unitLabel, unitTypeName, listUnitTypes } from '../../domain/units.js';
+import { unitLabel, listUnitTypes } from '../../domain/units.js';
 import { billFor } from '../../domain/folio.js';
 import { formatMoney } from '../../core/money.js';
-import { today, formatDate, nightsBetween } from '../../core/dates.js';
+import { today, formatDate } from '../../core/dates.js';
 import { printBill } from '../print-actions.js';
 import { bookingDetail } from './reservations.js';
 

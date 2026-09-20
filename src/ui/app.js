@@ -7,7 +7,7 @@
  */
 
 import { h, mount, clear, qs, debounce } from './dom.js';
-import { toast, fail, modal, closeAllModals } from './feedback.js';
+import { toast, modal, closeAllModals } from './feedback.js';
 import { t, setLanguage, getLanguage, dir } from '../core/i18n.js';
 import { formatDateLong, formatTime, today, nowIso } from '../core/dates.js';
 import { globalSearch } from '../domain/search.js';
@@ -133,7 +133,6 @@ export class App {
   }
 
   sidebar(counts, property) {
-    const store = this.store;
     return h('aside.sidebar', [
       h('div.sidebar__brand', [
         h('div.sidebar__mark', property.logo

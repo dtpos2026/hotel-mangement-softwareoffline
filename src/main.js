@@ -6,7 +6,7 @@ import { AppStore } from './core/store.js';
 import { App } from './ui/app.js';
 import { h, mount, qs } from './ui/dom.js';
 import { toast, modal, ok as toastOk, fail } from './ui/feedback.js';
-import { field, checkbox, card, alert } from './ui/components.js';
+import { field, alert } from './ui/components.js';
 import { PROPERTY_TYPES } from './core/schema.js';
 import { seedDemoData } from './core/demo.js';
 

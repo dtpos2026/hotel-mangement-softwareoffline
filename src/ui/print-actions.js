@@ -8,7 +8,7 @@
  */
 
 import { h, mount } from './dom.js';
-import { modal, toast, fail, ok as toastOk } from './feedback.js';
+import { modal, fail } from './feedback.js';
 import { segmented } from './components.js';
 import { printDocument, openDocument, printerSettings } from '../print/printer.js';
 import * as r80 from '../print/receipt80.js';

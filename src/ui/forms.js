@@ -6,20 +6,19 @@
  * check-in and from a walk-in, and all three must behave identically.
  */
 
-import { h, formValues, applyErrors, busy, qs, qsa, mount, readImage } from './dom.js';
-import { modal, toast, ok as toastOk, fail, confirm, promptText } from './feedback.js';
-import { field, checkbox, chipGroup, dataTable, alert, conflictList, moneyText, badge } from './components.js';
+import { h, formValues, applyErrors, busy, qs, mount } from './dom.js';
+import { modal, toast, ok as toastOk, fail, confirm } from './feedback.js';
+import { field, chipGroup, alert } from './components.js';
 import { formatCnic, formatPhone } from '../core/validate.js';
 import { formatMoney, toMoney } from '../core/money.js';
-import { today, addDays, formatDate, nightsBetween } from '../core/dates.js';
-import { PAYMENT_METHODS, BOOKING_SOURCES, GUEST_TYPES, CHARGE_CATEGORIES, EXPENSE_CATEGORIES, UNIT_STATUS } from '../core/schema.js';
+import { today, addDays, formatDate } from '../core/dates.js';
+import { PAYMENT_METHODS, GUEST_TYPES, CHARGE_CATEGORIES, EXPENSE_CATEGORIES, UNIT_STATUS } from '../core/schema.js';
 import * as guestsApi from '../domain/guests.js';
 import * as unitsApi from '../domain/units.js';
-import * as reservationsApi from '../domain/reservations.js';
 import * as paymentsApi from '../domain/payments.js';
 import * as folioApi from '../domain/folio.js';
 import * as expensesApi from '../domain/expenses.js';
-import { quote } from '../domain/pricing.js';
+
 
 const opt = (list) => list.map(x => ({ value: x.id, label: x.label }));
 

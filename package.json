@@ -1,10 +1,12 @@
 {
   "name": "hotel-management-offline",
   "version": "1.0.0",
-  "description": "Offline hotel / guest house / resort management system. No dependencies, no build step — index.html runs the app directly.",
+  "description": "Offline hotel / guest house / resort management system. No dependencies, no build step - index.html runs the app directly.",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/run.js && node tests/print.test.js && node tests/integration.test.js"
+    "test": "node tests/run.js && node tests/print.test.js && node tests/integration.test.js",
+    "test:browser": "node tests/browser.test.mjs",
+    "serve": "npx http-server -p 8080 -c-1 ."
   }
 }

@@ -7,8 +7,7 @@
  */
 
 import { h, mount, qs, busy } from '../dom.js';
-import { card, dataTable, emptyState, pageHead, field, chipGroup, alert, totalsRail,
-         moneyText, badge, railRows, filterBar } from '../components.js';
+import { card, dataTable, emptyState, pageHead, field, chipGroup, alert, totalsRail, moneyText, badge, railRows } from '../components.js';
 import { toast, ok as toastOk, fail, confirm, promptText, modal } from '../feedback.js';
 import { chargeForm, paymentForm } from '../forms.js';
 import * as reservationsApi from '../../domain/reservations.js';
@@ -16,7 +15,7 @@ import * as staysApi from '../../domain/stays.js';
 import * as unitsApi from '../../domain/units.js';
 import * as folioApi from '../../domain/folio.js';
 import { formatMoney, toMoney } from '../../core/money.js';
-import { today, formatDate, formatDateTime, nightsBetween } from '../../core/dates.js';
+import { today, formatDate, nightsBetween } from '../../core/dates.js';
 import { PAYMENT_METHODS } from '../../core/schema.js';
 import { printBill, printInvoice, printPaymentReceipt } from '../print-actions.js';
 

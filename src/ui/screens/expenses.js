@@ -3,13 +3,13 @@
  */
 
 import { h } from '../dom.js';
-import { card, dataTable, emptyState, pageHead, badge, kpi, filterBar, filterSelect, rangePicker, moneyText } from '../components.js';
-import { promptText, confirm, toast, ok as toastOk, fail } from '../feedback.js';
+import { card, dataTable, emptyState, pageHead, badge, kpi, filterBar, filterSelect, rangePicker } from '../components.js';
+import { promptText, ok as toastOk, fail } from '../feedback.js';
 import { expenseForm } from '../forms.js';
 import * as expensesApi from '../../domain/expenses.js';
 import { toCsv, downloadFile } from '../../core/backup.js';
 import { formatMoney } from '../../core/money.js';
-import { presetRange, formatDate, today } from '../../core/dates.js';
+import { presetRange } from '../../core/dates.js';
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../../core/schema.js';
 import { printReport } from '../print-actions.js';
 import { expensesReport } from '../../domain/reports.js';

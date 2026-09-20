@@ -6,14 +6,12 @@
  * actions the prototype only drew.
  */
 
-import { h, mount, qs } from '../dom.js';
-import { card, dataTable, emptyState, pageHead, unitBadge, hkBadge, badge, railRows,
-         filterBar, filterSelect, segmented, moneyText, alert } from '../components.js';
-import { confirm, toast, ok as toastOk, fail, promptText } from '../feedback.js';
+import { h } from '../dom.js';
+import { card, dataTable, emptyState, pageHead, unitBadge, hkBadge, badge, railRows, filterBar, filterSelect, segmented, moneyText, alert } from '../components.js';
+import { confirm, ok as toastOk, fail } from '../feedback.js';
 import { unitForm, unitTypeForm, maintenanceForm } from '../forms.js';
 import * as unitsApi from '../../domain/units.js';
 import * as hkApi from '../../domain/housekeeping.js';
-import { listReservations, conflictsFor } from '../../domain/reservations.js';
 import { billFor } from '../../domain/folio.js';
 import { UNIT_STATUS, HK_STATUS } from '../../core/schema.js';
 import { formatMoney } from '../../core/money.js';
@@ -100,7 +98,6 @@ export function render(ctx) {
 /* ------------------------------------------------------------------ views */
 
 function boardView(ctx, units) {
-  const { store } = ctx;
   const byFloor = new Map();
   units.forEach(u => {
     const key = u.floor || 'Unassigned';

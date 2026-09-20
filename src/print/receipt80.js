@@ -17,7 +17,7 @@
 
 import { printBase, escapeHtml, printerSettings, contentWidthMm } from './printer.js';
 import { formatMoney, toMoney } from '../core/money.js';
-import { formatDate, formatDateTime, formatTime, nowIso } from '../core/dates.js';
+import { formatDate, formatDateTime, nowIso } from '../core/dates.js';
 import { methodName } from '../domain/payments.js';
 import { maskCnic } from '../core/validate.js';
 
@@ -150,7 +150,10 @@ export function guestBill(store, ctx) {
     (reservation.children ? `, ${reservation.children} child${reservation.children === 1 ? '' : 'ren'}` : '');
   b.push(kv('Guests', people));
 
-  if (!compact) b.push('<div class="gap"></div>');
+  // A gap before the charge table in both modes — compact's is already less
+  // than half the height, and without it the table header runs straight into
+  // the guest block.
+  b.push('<div class="gap"></div>');
 
   // Charge table
   b.push(`<table class="items"><thead><tr>

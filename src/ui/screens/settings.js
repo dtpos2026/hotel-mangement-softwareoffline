@@ -4,15 +4,12 @@
  */
 
 import { h, mount, qs, formValues, busy, readImage } from '../dom.js';
-import { card, dataTable, emptyState, pageHead, field, checkbox, segmented, badge,
-         alert, kpi, railRows } from '../components.js';
+import { card, dataTable, emptyState, pageHead, field, checkbox, segmented, badge, alert, kpi, railRows } from '../components.js';
 import { modal, confirm, promptText, toast, ok as toastOk, info, warn, fail } from '../feedback.js';
-import { PROPERTY_TYPES, PAYMENT_METHODS } from '../../core/schema.js';
+import { PROPERTY_TYPES } from '../../core/schema.js';
 import { ROLES, roleLabel, hashPin, newSalt, permissionsFor, PERMISSIONS } from '../../core/auth.js';
-import { buildBackup, backupFilename, validateBackup, restoreBackup, readAutoBackups,
-         saveAutoBackup, downloadFile, readFileAsText } from '../../core/backup.js';
-import { formatDateTime, formatDate, nowIso, today } from '../../core/dates.js';
-import { formatMoney } from '../../core/money.js';
+import { buildBackup, backupFilename, validateBackup, restoreBackup, readAutoBackups, saveAutoBackup, downloadFile, readFileAsText } from '../../core/backup.js';
+import { formatDateTime, nowIso } from '../../core/dates.js';
 import { newId } from '../../core/ids.js';
 import { printTestPage } from '../print-actions.js';
 import { printerSettings, contentWidthMm } from '../../print/printer.js';
@@ -29,7 +26,7 @@ const TABS = [
 const state = { tab: 'property' };
 
 export function render(ctx) {
-  const { store, app, params } = ctx;
+  const { app, params } = ctx;
   if (params.tab) { state.tab = params.tab; params.tab = null; }
 
   const body = {
@@ -349,7 +346,7 @@ function bookingTab(ctx) {
 /* ------------------------------------------------------------------ users */
 
 function usersTab(ctx) {
-  const { store, app } = ctx;
+  const { store } = ctx;
   const canManage = store.session.can('user.manage');
   const users = store.db.all('users').filter(u => !u.archivedAt);
 
@@ -669,7 +666,7 @@ function startRestoreFromText(ctx, text, filename) {
 /* ------------------------------------------------------------------ about */
 
 function aboutTab(ctx) {
-  const { store, app } = ctx;
+  const { store } = ctx;
   const health = store.health();
   const canReset = store.session.can('data.reset');
 
@@ -711,7 +708,7 @@ function aboutTab(ctx) {
 }
 
 async function confirmReset(ctx) {
-  const { store, app } = ctx;
+  const { store } = ctx;
   const health = store.health();
   const total = Object.values(health.counts).reduce((a, b) => a + b, 0);
 

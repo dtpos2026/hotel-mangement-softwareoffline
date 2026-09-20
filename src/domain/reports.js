@@ -8,10 +8,10 @@
 
 import { toMoney } from '../core/money.js';
 import { today, inRange, dateOfIso, formatDate, formatDateTime, eachDay, nightsList, presetRange } from '../core/dates.js';
-import { billFor, paidTotal } from './folio.js';
+import { billFor } from './folio.js';
 import { listPayments, collectionBreakdown, outstanding } from './payments.js';
-import { listExpenses, totalsByCategory } from './expenses.js';
-import { listReservations, arrivalsOn, departuresOn } from './reservations.js';
+import { totalsByCategory } from './expenses.js';
+import { arrivalsOn, departuresOn } from './reservations.js';
 import { listUnits } from './units.js';
 import { methodName } from './payments.js';
 import { sourceLabel, reservationStatusOf } from '../core/schema.js';

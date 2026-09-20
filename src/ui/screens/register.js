@@ -8,10 +8,10 @@
 
 import { h } from '../dom.js';
 import { card, dataTable, emptyState, pageHead, badge, segmented, filterBar, rangePicker } from '../components.js';
-import { toast, ok as toastOk, fail } from '../feedback.js';
+import { ok as toastOk, fail } from '../feedback.js';
 import { registerReport } from '../../domain/reports.js';
 import { toCsv, downloadFile } from '../../core/backup.js';
-import { presetRange, today, formatDate } from '../../core/dates.js';
+import { presetRange, formatDate } from '../../core/dates.js';
 import { formatMoney } from '../../core/money.js';
 import { printReport } from '../print-actions.js';
 import { bookingDetail } from './reservations.js';

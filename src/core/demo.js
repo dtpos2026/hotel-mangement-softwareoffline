@@ -66,16 +66,16 @@ export async function seedDemoData(store) {
   }
 
   const guestSpecs = [
-    ['Muhammad Bilal', 'Abdul Rahman', '15302-1234567-1', '0300-1234567', 'Lahore', 'Islamabad'],
-    ['Ayesha Khan', 'Tariq Khan', '35202-9988771-4', '0321-8899001', 'Lahore', 'Lahore'],
-    ['Zahid Ullah', 'Noor Ullah', '17301-4455662-9', '0345-7712345', 'Mardan', 'Mardan'],
-    ['Sardar Ali', 'Ghulam Ali', '15602-1122334-7', '0301-4455667', 'Karachi', 'Karachi'],
-    ['Farhan Malik', 'Iqbal Malik', '61101-2233445-1', '0333-4412200', 'Islamabad', 'Islamabad'],
-    ['Noreen Baig', 'Sher Baig', '15302-7766554-3', '0312-9988776', 'Peshawar', 'Peshawar']
+    ['Muhammad Bilal', 'Abdul Rahman', '15302-1234567-1', '0300-1234567', 'Lahore'],
+    ['Ayesha Khan', 'Tariq Khan', '35202-9988771-4', '0321-8899001', 'Lahore'],
+    ['Zahid Ullah', 'Noor Ullah', '17301-4455662-9', '0345-7712345', 'Mardan'],
+    ['Sardar Ali', 'Ghulam Ali', '15602-1122334-7', '0301-4455667', 'Karachi'],
+    ['Farhan Malik', 'Iqbal Malik', '61101-2233445-1', '0333-4412200', 'Islamabad'],
+    ['Noreen Baig', 'Sher Baig', '15302-7766554-3', '0312-9988776', 'Peshawar']
   ];
 
   const guests = {};
-  for (const [fullName, fatherName, cnic, phone, city, from] of guestSpecs) {
+  for (const [fullName, fatherName, cnic, phone, city] of guestSpecs) {
     guests[fullName] = await saveGuest(store, {
       fullName, fatherName, cnic, phone, whatsapp: phone, city, country: 'Pakistan',
       address: `${city}`, guestType: 'individual'

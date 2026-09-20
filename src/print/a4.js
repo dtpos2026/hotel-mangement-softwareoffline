@@ -9,7 +9,7 @@
  */
 
 import { printBase, escapeHtml, printerSettings } from './printer.js';
-import { formatMoney, toMoney, amountInWords } from '../core/money.js';
+import { formatMoney, amountInWords } from '../core/money.js';
 import { formatDate, formatDateTime, nowIso } from '../core/dates.js';
 import { methodName } from '../domain/payments.js';
 import { maskCnic } from '../core/validate.js';
@@ -47,6 +47,7 @@ function a4Css(marginMm, landscape) {
       background: #F1F3F2; font-size: 7.6pt; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; white-space: nowrap;
     }
     table.grid td { padding: 4.5px 6px; border-bottom: 1px solid #E2E6E4; vertical-align: top; }
+    table.grid td.d { white-space: nowrap; }
     table.grid tr:nth-child(even) td { background: #FAFBFB; }
     table.grid .n { text-align: right; font-variant-numeric: tabular-nums; font-family: 'Consolas', monospace; white-space: nowrap; }
     table.grid tfoot td { border-top: 1.5px solid #16202A; border-bottom: 0; font-weight: 700; background: #F1F3F2; padding: 6px; }
@@ -159,7 +160,9 @@ export function reportDocument(store, report, opts) {
     const body = rows.length
       ? rows.map(r => `<tr>${report.columns.map(c => {
           const raw = typeof c.value === 'function' ? c.value(r) : r[c.key];
-          const cls = (c.align === 'end' || c.format === 'money' || c.format === 'percent') ? 'n' : '';
+          const numeric = c.align === 'end' || c.format === 'money' || c.format === 'percent';
+          // Dates must not break across lines in a squeezed print column.
+          const cls = numeric ? 'n' : (/date|check|^in$|^out$/i.test(c.key) ? 'd' : '');
           return `<td class="${cls}">${escapeHtml(fmtCell(raw, c, currency))}</td>`;
         }).join('')}</tr>`).join('')
       : `<tr><td colspan="${report.columns.length}" style="text-align:center;padding:26px;color:#6B7280">No records in this period.</td></tr>`;

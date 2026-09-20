@@ -12,7 +12,7 @@ import { newId } from '../core/ids.js';
 import { makeFolioLine, CHARGE_CATEGORIES } from '../core/schema.js';
 import { nowIso, today, formatDate } from '../core/dates.js';
 import { toMoney, mul, percent, clampPositive } from '../core/money.js';
-import { roomCharge, discountAmount, taxConfig } from './pricing.js';
+import { roomCharge, taxConfig } from './pricing.js';
 import { required, positiveInt, collect } from '../core/validate.js';
 
 export function linesFor(store, reservationId, opts) {

@@ -7,7 +7,7 @@
  */
 
 import { newId } from '../core/ids.js';
-import { nowIso, today, dateOfIso, addDays, formatDate } from '../core/dates.js';
+import { nowIso, today, addDays, formatDate } from '../core/dates.js';
 import { toMoney } from '../core/money.js';
 import { PAYMENT_METHODS } from '../core/schema.js';
 import { listPayments, collectionBreakdown } from './payments.js';

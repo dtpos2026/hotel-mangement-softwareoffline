@@ -104,14 +104,31 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; }
 
-/* Figures, dates and serials stay in logical LTR order even in an RTL page —
-   this rule comes from the prototype and is one of its best details. */
-.mono, .num, .figure {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
+/* Figures, dates and serials stay in logical LTR order even in an RTL page.
+   The rule comes from the prototype, where it applied to anything styled with
+   the mono font. Every class that renders a figure has to be listed here, or
+   "Rs 13,950" reorders to "13,950 Rs" once the interface is in Urdu. */
+.mono, .num, .figure,
+.kpi__value, .kpi__sub,
+.rail__v, .totals__value,
+.unit-card__code, .unit-card__detail,
+.cal__day-num, .sidebar__meta, .topbar__clock,
+.search__result-sub, .nav-item__count, .search__kbd, .btn__key,
+.summary__value {
   direction: ltr;
   unicode-bidi: isolate;
 }
+
+.mono, .num, .figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* An isolated figure still has to sit on the correct edge of its container. */
+[dir="rtl"] .rail__v,
+[dir="rtl"] .totals__value,
+[dir="rtl"] .table td.num,
+[dir="rtl"] .table th.num { text-align: left; }
 
 .ur { font-family: var(--font-ur); line-height: 2; }
 
