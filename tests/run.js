@@ -314,6 +314,37 @@ ok('dashboard lists arrivals', Array.isArray(dash.arrivals));
 ok('dashboard shows outstanding money', dash.outstanding >= 0);
 ok('dashboard shows recent activity', dash.recent.length > 0);
 
+suite('Bed layout for the plan view');
+
+const layoutOf = text => units.bedLayout(store, { unitTypeId: tDeluxe.id, bedConfig: text });
+const kindsOf = text => layoutOf(text).beds.map(b => b.key).join(',');
+
+eq('a single bed is read', kindsOf('1 double'), 'double');
+eq('counts are honoured', kindsOf('2 single'), 'single,single');
+eq('a plus joins two groups', kindsOf('1 double + 1 single'), 'double,single');
+eq('a comma joins two groups', kindsOf('1 king, 2 singles'), 'king,single,single');
+eq('the word "and" joins two groups', kindsOf('double bed and a bunk'), 'double,bunk');
+eq('plain words without a count mean one bed', kindsOf('queen'), 'queen');
+eq('a sofa bed is recognised', kindsOf('1 double + 1 sofa'), 'double,sofa');
+eq('an unknown word is skipped, not guessed at', kindsOf('1 double + 1 hammock'), 'double');
+eq('sleeps adds up the beds', layoutOf('1 double + 1 single').sleeps, 3);
+eq('a bunk sleeps two', layoutOf('1 bunk').sleeps, 2);
+ok('recorded text is not flagged as a guess', layoutOf('1 double').inferred === false);
+ok('a silly count cannot blow the layout up', layoutOf('999 single').beds.length <= 12);
+
+// With nothing recorded, the plan still has to show something true.
+const guessed = units.bedLayout(store, { unitTypeId: tDeluxe.id, bedConfig: '' });
+ok('an empty configuration is inferred from the capacity', guessed.inferred === true);
+ok('the inferred layout has beds', guessed.beds.length > 0);
+ok('the inferred layout sleeps at least the adult capacity', guessed.sleeps >= 2);
+ok('nonsense text falls back to the inferred layout', units.bedLayout(store, { unitTypeId: tDeluxe.id, bedConfig: 'tbc' }).beds.length > 0);
+
+eq('a family suite infers beds for four adults',
+  units.bedLayout(store, { unitTypeId: tFamily.id, bedConfig: '' }).beds.filter(b => b.key === 'double').length, 2);
+
+ok('every bed kind carries a short code that fits a drawn bed',
+  units.BED_KINDS.every(k => k.short && k.short.length <= 5 && k.label && k.width >= 2));
+
 suite('Money and dates');
 eq('money parses a formatted string', money.toMoney('14,000'), 14000);
 eq('money never produces a float', money.percent(22800, 5), 1140);

@@ -916,3 +916,118 @@ p { margin: 0; }
   .menu-item { min-height: 88px; }
   .table-card { min-height: 128px; }
 }
+
+/* ==========================================================================
+   Unit plan view — rooms drawn with the beds they contain
+   ========================================================================== */
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.plan-card {
+  --tone: var(--ok);
+  text-align: start;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  padding: 11px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 90ms linear, box-shadow 90ms linear;
+}
+.plan-card:hover { border-color: var(--tone); box-shadow: var(--shadow-rail); }
+.plan-card.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-tint); }
+
+.plan-card[data-status="available"]   { --tone: var(--ok); }
+.plan-card[data-status="reserved"]    { --tone: var(--accent); }
+.plan-card[data-status="occupied"]    { --tone: var(--river); }
+.plan-card[data-status="cleaning"]    { --tone: var(--warn); }
+.plan-card[data-status="maintenance"] { --tone: var(--muted); }
+.plan-card[data-status="blocked"]     { --tone: var(--muted-soft); }
+
+.plan-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.plan-card__code {
+  font-family: var(--font-mono); font-size: 18px; font-weight: 700; letter-spacing: -0.02em;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.plan-card__status { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; flex: 0 0 auto; }
+.plan-card__type { font-size: 11.5px; color: var(--muted); margin-top: -3px; }
+
+/* The room outline. Beds sit inside it, sized relative to each other so a
+   double reads as wider than a single without needing a legend. */
+.plan-room {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  min-height: 86px;
+  padding: 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r);
+  background:
+    linear-gradient(var(--surface-sunk), var(--surface-sunk)) padding-box;
+}
+
+.plan-bed {
+  --w: 2;
+  position: relative;
+  flex: 0 0 auto;
+  width: calc(var(--w) * 24px);
+  height: 36px;
+  border: 1.5px solid var(--tone);
+  border-radius: 3px;
+  background: var(--surface);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+/* The pillow end, so a bed reads as a bed and not as a box. */
+.plan-bed__pillow {
+  position: absolute;
+  top: 2px; inset-inline-start: 2px;
+  width: 9px; height: 5px;
+  border-radius: 1px;
+  background: var(--tone);
+  opacity: 0.55;
+}
+.plan-bed__label {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  padding-bottom: 4px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.plan-bed[data-kind="bunk"] { border-style: double; border-width: 3px; }
+.plan-bed[data-kind="sofa"],
+.plan-bed[data-kind="extra"] { border-style: dashed; }
+
+.plan-card__beds {
+  display: flex; align-items: baseline; gap: 6px;
+  font-size: 11.5px; color: var(--ink);
+}
+.plan-card__sleeps { color: var(--muted); margin-inline-start: auto; font-family: var(--font-mono); }
+.plan-card__guess {
+  width: 14px; height: 14px; border-radius: 99px;
+  background: var(--warn-bg); color: #8A5B00;
+  border: 1px solid var(--warn-line);
+  font-size: 9px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: help; flex: 0 0 14px;
+}
+
+.plan-card__foot {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding-top: 6px; border-top: 1px solid var(--line-soft);
+  font-size: 12px; min-width: 0;
+}
+.plan-card__foot .mono { font-size: 12px; }
+
+@media (pointer: coarse) { .plan-bed { height: 40px; } }

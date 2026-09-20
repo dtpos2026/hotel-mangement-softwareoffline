@@ -94,6 +94,68 @@ export function isSellable(unit) {
   return unit.status !== 'maintenance' && unit.status !== 'blocked';
 }
 
+/**
+ * Turns a bed configuration written in plain words into something drawable.
+ *
+ * Staff type these freehand — "2 double + 1 single", "1 king, 2 singles",
+ * "double bed and a bunk" — so the parser is forgiving and falls back to
+ * inferring beds from the capacity rather than showing nothing.
+ */
+// `short` is what fits inside a drawn bed; `label` is what a tooltip says.
+// Every pattern tolerates a plural, because staff write "2 singles" as often
+// as "2 single". The list is searched in order, so the more specific kinds
+// come before the general ones ("extra single bed" is an extra, not a single).
+const BED_KINDS = [
+  { key: 'king',   match: /\bkings?\b/i,                            label: 'King',   short: 'KING',  sleeps: 2, width: 3 },
+  { key: 'queen',  match: /\bqueens?\b/i,                           label: 'Queen',  short: 'QUEEN', sleeps: 2, width: 3 },
+  { key: 'bunk',   match: /\bbunks?\b/i,                            label: 'Bunk',   short: 'BUNK',  sleeps: 2, width: 2 },
+  { key: 'sofa',   match: /\bsofas?\b|\bcouch(es)?\b/i,              label: 'Sofa',   short: 'SOFA',  sleeps: 1, width: 2 },
+  { key: 'extra',  match: /\bextras?\b|\bfold\w*\b|\bcamps?\b|\bmattress(es)?\b/i,
+                                                                   label: 'Extra',  short: 'EXTRA', sleeps: 1, width: 2 },
+  { key: 'double', match: /\bdoubles?\b|\bmasters?\b/i,             label: 'Double', short: 'DBL',   sleeps: 2, width: 3 },
+  { key: 'twin',   match: /\btwins?\b/i,                            label: 'Twin',   short: 'TWIN',  sleeps: 1, width: 2 },
+  { key: 'single', match: /\bsingles?\b/i,                          label: 'Single', short: 'SGL',   sleeps: 1, width: 2 }
+];
+
+export function bedLayout(store, unit) {
+  const text = String((unit && unit.bedConfig) || '').trim();
+  const beds = [];
+
+  if (text) {
+    // Split on separators people actually use between bed groups.
+    for (const part of text.split(/[,+&]|\band\b/i)) {
+      const chunk = part.trim();
+      if (!chunk) continue;
+      const countMatch = /(\d+)/.exec(chunk);
+      const count = countMatch ? Math.min(12, Math.max(1, Number(countMatch[1]))) : 1;
+      const kind = BED_KINDS.find(k => k.match.test(chunk));
+      if (!kind) continue;
+      for (let i = 0; i < count; i++) beds.push(kind);
+    }
+  }
+
+  if (!beds.length) {
+    // Nothing recognisable: infer a sensible arrangement from the capacity, so
+    // the plan still shows something true rather than an empty room.
+    const cap = capacityOf(store, unit);
+    let left = Math.max(1, cap.adults);
+    const dbl = BED_KINDS.find(k => k.key === 'double');
+    const sgl = BED_KINDS.find(k => k.key === 'single');
+    while (left >= 2) { beds.push(dbl); left -= 2; }
+    while (left > 0) { beds.push(sgl); left -= 1; }
+    for (let i = 0; i < Math.min(4, Number(cap.children) || 0); i++) beds.push(sgl);
+  }
+
+  return {
+    beds: beds.slice(0, 12),
+    sleeps: beds.reduce((n, b) => n + b.sleeps, 0),
+    inferred: !text,
+    text
+  };
+}
+
+export { BED_KINDS };
+
 export function capacityOf(store, unit) {
   const type = unit && unit.unitTypeId ? store.db.get('unitTypes', unit.unitTypeId) : null;
   const adults = Number(unit && unit.capacityAdults) || Number(type && type.capacityAdults) || 0;

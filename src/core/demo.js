@@ -45,24 +45,32 @@ export async function seedDemoData(store) {
   });
 
   const unitSpecs = [
-    ['101', standard, 'Ground floor'], ['102', standard, 'Ground floor'],
-    ['103', standard, 'Ground floor'], ['104', standard, 'Ground floor'],
-    ['105', deluxe, 'Ground floor'], ['106', deluxe, 'Ground floor'],
-    ['201', deluxe, 'First floor'], ['202', deluxe, 'First floor'],
-    ['203', deluxe, 'First floor'], ['204', deluxe, 'First floor'],
-    ['205', family, 'First floor'], ['206', family, 'First floor'],
-    ['301', family, 'Second floor'], ['302', family, 'Second floor'],
-    ['Cottage 07', cottage, 'Garden'], ['Cottage 08', cottage, 'Garden']
+    ['101', standard, 'Ground floor', '1 double'],
+    ['102', standard, 'Ground floor', '2 single'],
+    ['103', standard, 'Ground floor', '1 double'],
+    ['104', standard, 'Ground floor', '2 single'],
+    ['105', deluxe, 'Ground floor', '1 king'],
+    ['106', deluxe, 'Ground floor', '1 double + 1 single'],
+    ['201', deluxe, 'First floor', '1 king'],
+    ['202', deluxe, 'First floor', '1 double + 1 single'],
+    ['203', deluxe, 'First floor', '1 queen'],
+    ['204', deluxe, 'First floor', '1 double + 1 single'],
+    ['205', family, 'First floor', '2 double + 1 single'],
+    ['206', family, 'First floor', '1 double + 1 bunk'],
+    ['301', family, 'Second floor', '2 double + 1 sofa'],
+    ['302', family, 'Second floor', '1 king + 2 single'],
+    ['Cottage 07', cottage, 'Garden', '2 double + 2 single'],
+    ['Cottage 08', cottage, 'Garden', '3 double + 1 bunk']
   ];
 
   const units = {};
-  for (const [code, type, floor] of unitSpecs) {
+  for (const [code, type, floor, bedConfig] of unitSpecs) {
     units[code] = await saveUnit(store, {
       code, unitTypeId: type.id, floor,
       capacityAdults: type.capacityAdults, capacityChildren: type.capacityChildren,
       baseRate: type.defaultRate, weekendRate: type.weekendRate,
       extraBedCharge: type.extraBedCharge, amenities: type.amenities,
-      bedConfig: type.capacityAdults > 2 ? '2 double + 1 single' : '1 double'
+      bedConfig
     });
   }
 

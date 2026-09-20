@@ -11,6 +11,7 @@ import { card, dataTable, emptyState, pageHead, unitBadge, hkBadge, badge, railR
 import { confirm, ok as toastOk, fail } from '../feedback.js';
 import { unitForm, unitTypeForm, maintenanceForm } from '../forms.js';
 import * as unitsApi from '../../domain/units.js';
+import { bedLayout } from '../../domain/units.js';
 import * as hkApi from '../../domain/housekeeping.js';
 import { billFor } from '../../domain/folio.js';
 import { UNIT_STATUS, HK_STATUS } from '../../core/schema.js';
@@ -72,7 +73,11 @@ export function render(ctx) {
       ? h('button.btn.btn--sm.btn--ghost', { type: 'button', text: 'Clear',
           onclick: () => { state.floor = state.typeId = state.status = ''; app.refresh(); } }) : null,
     h('span.push', segmented({
-      options: [{ value: 'board', label: 'Board' }, { value: 'list', label: 'List' }],
+      options: [
+        { value: 'board', label: 'Board' },
+        { value: 'plan', label: 'Plan' },
+        { value: 'list', label: 'List' }
+      ],
       value: state.view, onChange: v => { state.view = v; app.refresh(); }
     }))
   ]);
@@ -85,7 +90,9 @@ export function render(ctx) {
       h('div.stack', [
         filters,
         units.length
-          ? (state.view === 'board' ? boardView(ctx, units) : listView(ctx, units))
+          ? (state.view === 'board' ? boardView(ctx, units)
+             : state.view === 'plan' ? planView(ctx, units)
+             : listView(ctx, units))
           : card({}, emptyState({ title: 'No ' + word.toLowerCase() + ' matches these filters',
               action: h('button.btn', { type: 'button', text: 'Clear filters',
                 onclick: () => { state.floor = state.typeId = state.status = ''; app.refresh(); } }) }))
@@ -184,6 +191,77 @@ function unitCard(ctx, unit) {
       h('div.unit-card__guest', { text: guest ? guest.fullName : '—' }),
       h('div.unit-card__detail', { class: tone === 'due' ? 'money-due' : null, text: detail })
     ])
+  ]);
+}
+
+/**
+ * The plan view: every unit drawn with the beds it actually contains, grouped
+ * by floor. It answers the question a receptionist asks on the phone — "how
+ * many beds is that room?" — without opening anything.
+ */
+function planView(ctx, units) {
+  const { store } = ctx;
+  const byFloor = new Map();
+  units.forEach(u => {
+    const key = u.floor || 'Unassigned';
+    if (!byFloor.has(key)) byFloor.set(key, []);
+    byFloor.get(key).push(u);
+  });
+  const ordered = Array.from(byFloor.entries()).sort((a, b) => compareFloors(a[0], b[0]));
+
+  return h('div', ordered.map(([floor, list]) => {
+    const beds = list.reduce((n, u) => n + bedLayout(store, u).sleeps, 0);
+    return h('section.card.board-section', [
+      h('div.card__head', [
+        h('h2.card__title', { text: floor }),
+        h('span.card__note', { text: `${list.length} ${store.unitWord().toLowerCase()}(s) · ${beds} bed spaces` })
+      ]),
+      h('div.plan-grid', list.map(u => planCard(ctx, u)))
+    ]);
+  }));
+}
+
+function planCard(ctx, unit) {
+  const { store, app } = ctx;
+  const currency = store.currency();
+  const layout = bedLayout(store, unit);
+  const stay = store.db.first('reservations', r => r.unitId === unit.id && r.status === 'checked_in');
+  const guest = stay ? store.db.get('guests', stay.guestId) : null;
+  const bill = stay ? billFor(store, stay) : null;
+  const cap = unitsApi.capacityOf(store, unit);
+
+  return h('button.plan-card', {
+    type: 'button',
+    'data-status': unit.status,
+    class: unit.id === state.selectedId ? 'is-selected' : null,
+    title: `${unit.code} — ${layout.beds.map(b => b.label).join(' + ')}`,
+    onclick: () => { state.selectedId = unit.id; app.refresh(); }
+  }, [
+    h('div.plan-card__head', [
+      h('span.plan-card__code', { text: unit.code }),
+      h('span.plan-card__status', { style: { color: unitStatusColor(unit.status) },
+        text: (UNIT_STATUS.find(s => s.id === unit.status) || {}).label || unit.status })
+    ]),
+    h('div.plan-card__type', { text: unitsApi.unitTypeName(store, unit.unitTypeId) }),
+
+    // The room itself, with its beds drawn to scale against each other.
+    h('div.plan-room', layout.beds.map(bed =>
+      h('div.plan-bed', { 'data-kind': bed.key, title: bed.label, style: { '--w': String(bed.width) } }, [
+        h('span.plan-bed__pillow'),
+        h('span.plan-bed__label', { text: bed.short })
+      ]))),
+
+    h('div.plan-card__beds', [
+      h('span', { text: layout.beds.length + ' bed' + (layout.beds.length === 1 ? '' : 's') }),
+      h('span.plan-card__sleeps', { text: 'sleeps ' + layout.sleeps }),
+      layout.inferred ? h('span.plan-card__guess', { title: 'No bed configuration is recorded, so this is worked out from the capacity.', text: '?' }) : null
+    ]),
+
+    h('div.plan-card__foot', guest
+      ? [h('span.truncate', { text: guest.fullName }),
+         bill && bill.balance > 0 ? h('span.money-due.mono', { text: formatMoney(bill.balance, currency) }) : null]
+      : [h('span.text-muted', { text: `${cap.adults} adult${cap.adults === 1 ? '' : 's'}` }),
+         h('span.mono', { text: formatMoney(unit.baseRate, currency) })])
   ]);
 }
 
