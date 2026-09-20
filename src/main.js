@@ -28,11 +28,12 @@ import * as expenses from './ui/screens/expenses.js';
 import * as reports from './ui/screens/reports.js';
 import * as closing from './ui/screens/closing.js';
 import * as settings from './ui/screens/settings.js';
+import * as restaurant from './ui/screens/restaurant.js';
 import * as activation from './ui/screens/activation.js';
 
 const SCREEN_MODULES = {
   dashboard, units, calendar, reservations, checkin, inhouse, checkout,
-  guests, register, payments, housekeeping, expenses, reports, closing, settings,
+  guests, register, payments, restaurant, housekeeping, expenses, reports, closing, settings,
   activation
 };
 

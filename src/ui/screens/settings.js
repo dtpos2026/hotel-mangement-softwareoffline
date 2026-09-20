@@ -3,7 +3,7 @@
  * currency and tax, booking rules, users and roles, backup and restore.
  */
 
-import { h, mount, qs, formValues, busy, readImage } from '../dom.js';
+import { h, mount, qs, formValues, applyErrors, busy, readImage } from '../dom.js';
 import { card, dataTable, emptyState, pageHead, field, checkbox, segmented, badge, alert, kpi, railRows } from '../components.js';
 import { modal, confirm, promptText, toast, ok as toastOk, info, warn, fail } from '../feedback.js';
 import { PROPERTY_TYPES } from '../../core/schema.js';
@@ -16,6 +16,8 @@ import { printerSettings, contentWidthMm } from '../../print/printer.js';
 import * as host from '../../core/host.js';
 import { activationCard } from './activation.js';
 import { whatsappPanel } from '../whatsapp.js';
+import * as rest from '../../domain/restaurant.js';
+import { CATEGORY_COLOURS } from '../../core/schema.js';
 
 const TABS = [
   { id: 'property', label: 'Property' },
@@ -23,6 +25,7 @@ const TABS = [
   { id: 'booking', label: 'Booking rules' },
   { id: 'users', label: 'Users & roles' },
   { id: 'backup', label: 'Backup & restore' },
+  { id: 'restaurant', label: 'Restaurant' },
   { id: 'whatsapp', label: 'WhatsApp' },
   { id: 'licence', label: 'Licence' },
   { id: 'about', label: 'About & data' }
@@ -36,7 +39,7 @@ export function render(ctx) {
 
   const body = {
     property: propertyTab, printing: printingTab, booking: bookingTab,
-    users: usersTab, backup: backupTab, whatsapp: whatsappTab,
+    users: usersTab, backup: backupTab, restaurant: restaurantTab, whatsapp: whatsappTab,
     licence: licenceTab, about: aboutTab
   }[state.tab] || propertyTab;
 
@@ -799,6 +802,260 @@ function startRestoreFromText(ctx, text, filename) {
     ]
   });
   return dialog;
+}
+
+/* ------------------------------------------------------------- restaurant */
+
+function restaurantTab(ctx) {
+  const { store, app } = ctx;
+  const canEdit = store.session.can('settings.manage');
+  const cfg = rest.settings(store);
+  const categories = rest.listCategories(store);
+  const items = rest.listMenuItems(store, { includeArchived: false });
+  const tables = rest.listTables(store);
+  const currency = store.currency();
+
+  const form = h('div.stack', [
+    card({ title: 'Restaurant module' }, h('div.stack', [
+      checkbox({ label: 'Enable the restaurant point of sale', name: 'enabled', value: cfg.enabled, disabled: !canEdit }),
+      h('div.field__hint', { text: 'When on, a Restaurant entry appears in the sidebar with a table floor plan, menu and order taking.' }),
+      h('div.form-grid.form-grid--3', [
+        field({ label: 'Service charge %', name: 'serviceChargePercent', type: 'number', min: 0, max: 100, step: '0.5',
+          value: cfg.serviceChargePercent, disabled: !canEdit, hint: '0 for none' }),
+        h('div.field', { style: { justifyContent: 'flex-end' } },
+          checkbox({ label: 'Print a kitchen slip when items are sent', name: 'printKitchenSlip', value: cfg.printKitchenSlip, disabled: !canEdit })),
+        h('div.field', { style: { justifyContent: 'flex-end' } },
+          checkbox({ label: 'Allow posting an order to a room bill', name: 'allowPostToRoom', value: cfg.allowPostToRoom, disabled: !canEdit }))
+      ]),
+      field({ label: 'Default area name', name: 'defaultArea', value: cfg.defaultArea, disabled: !canEdit,
+        placeholder: 'Main hall' })
+    ]))
+  ]);
+
+  return h('div.stack', [
+    !canEdit ? alert('info', 'Read-only', 'Only a manager or admin can change these.') : null,
+    form,
+    canEdit ? h('div.row', [
+      h('button.btn.btn--primary', { type: 'button', text: 'Save restaurant settings',
+        onclick: e => busy(e.currentTarget, async () => {
+          const v = formValues(form);
+          try {
+            await store.updateSetting('restaurant', {
+              enabled: !!v.enabled,
+              serviceChargePercent: Number(v.serviceChargePercent) || 0,
+              printKitchenSlip: !!v.printKitchenSlip,
+              allowPostToRoom: !!v.allowPostToRoom,
+              defaultArea: String(v.defaultArea || 'Main hall').trim()
+            });
+            toastOk('Restaurant settings saved');
+            app.render();
+          } catch (err) { fail(err); }
+        }) })
+    ]) : null,
+
+    /* --- categories --- */
+    card({
+      title: 'Menu categories', note: String(categories.length), flush: true,
+      tools: canEdit ? [h('button.btn.btn--sm.btn--primary', { type: 'button', text: 'Add category',
+        onclick: () => categoryForm(ctx, null) })] : []
+    }, categories.length ? dataTable({
+      compact: true,
+      columns: [
+        { key: 'colour', label: '', width: '38px', render: c => h('span', {
+            style: { display: 'inline-block', width: '16px', height: '16px', borderRadius: '4px', background: c.colour } }) },
+        { key: 'name', label: 'Category' },
+        { key: 'nameUr', label: 'Urdu', render: c => c.nameUr ? h('span.ur', { text: c.nameUr }) : '—' },
+        { key: 'items', label: 'Items', align: 'end', render: c => String(items.filter(i => i.categoryId === c.id).length) },
+        { key: 'act', label: '', render: c => canEdit ? h('div.row.row--tight', [
+            h('button.btn.btn--sm', { type: 'button', text: 'Edit', onclick: () => categoryForm(ctx, c) }),
+            h('button.btn.btn--sm.btn--ghost', { type: 'button', text: 'Archive',
+              onclick: async () => {
+                try { await rest.archiveCategory(store, c.id); toastOk('Category archived'); app.refresh(); }
+                catch (err) { fail(err); }
+              } })
+          ]) : null }
+      ],
+      rows: categories
+    }) : emptyState({ title: 'No categories yet', body: 'Start with Food and Drinks, then add items to them.' })),
+
+    /* --- menu items --- */
+    card({
+      title: 'Menu items', note: String(items.length), flush: true,
+      tools: canEdit ? [h('button.btn.btn--sm.btn--primary', { type: 'button', text: 'Add item',
+        onclick: () => menuItemForm(ctx, null) })] : []
+    }, items.length ? dataTable({
+      currency, compact: true,
+      columns: [
+        { key: 'code', label: 'Code', render: i => h('span.mono.text-sm', { text: i.code || '—' }) },
+        { key: 'name', label: 'Item', render: i => h('div', [
+            h('div.strong', { text: i.name }),
+            i.nameUr ? h('div.ur.text-xs.text-muted', { text: i.nameUr }) : null
+          ]) },
+        { key: 'category', label: 'Category', render: i => {
+            const c = store.db.get('menuCategories', i.categoryId);
+            return c ? h('span.badge', { style: { color: c.colour, background: c.colour + '14', borderColor: c.colour + '33' }, text: c.name }) : '—';
+          } },
+        { key: 'price', label: 'Price', align: 'end', format: 'money' },
+        { key: 'available', label: 'On the menu', render: i => i.available ? badge('Yes', 'ok') : badge('Off', 'muted') },
+        { key: 'act', label: '', render: i => canEdit ? h('div.row.row--tight', [
+            h('button.btn.btn--sm', { type: 'button', text: 'Edit', onclick: () => menuItemForm(ctx, i) }),
+            h('button.btn.btn--sm.btn--ghost', { type: 'button', text: 'Archive',
+              onclick: async () => {
+                try { await rest.archiveMenuItem(store, i.id); toastOk('Item archived'); app.refresh(); }
+                catch (err) { fail(err); }
+              } })
+          ]) : null }
+      ],
+      rows: items
+    }) : emptyState({ title: 'No menu items yet', body: 'Add a category first, then the dishes that belong to it.' })),
+
+    /* --- tables --- */
+    card({
+      title: 'Tables', note: String(tables.length), flush: true,
+      tools: canEdit ? [h('button.btn.btn--sm.btn--primary', { type: 'button', text: 'Add table',
+        onclick: () => tableForm(ctx, null) })] : []
+    }, tables.length ? dataTable({
+      compact: true,
+      columns: [
+        { key: 'code', label: 'Table', render: t => h('span.mono.strong', { text: t.code }) },
+        { key: 'name', label: 'Name' },
+        { key: 'area', label: 'Area' },
+        { key: 'seats', label: 'Seats', align: 'end' },
+        { key: 'shape', label: 'Shape' },
+        { key: 'status', label: 'Status', render: t => {
+            const order = rest.openOrderForTable(store, t.id);
+            return order ? badge('In use', 'river') : badge('Free', 'ok');
+          } },
+        { key: 'act', label: '', render: t => canEdit ? h('div.row.row--tight', [
+            h('button.btn.btn--sm', { type: 'button', text: 'Edit', onclick: () => tableForm(ctx, t) }),
+            h('button.btn.btn--sm.btn--ghost', { type: 'button', text: 'Archive',
+              onclick: async () => {
+                try { await rest.archiveTable(store, t.id); toastOk('Table archived'); app.refresh(); }
+                catch (err) { fail(err); }
+              } })
+          ]) : null }
+      ],
+      rows: tables
+    }) : emptyState({ title: 'No tables yet', body: 'Add your tables and they appear as a floor plan on the Restaurant screen.' }))
+  ]);
+}
+
+function categoryForm(ctx, category) {
+  const { store, app } = ctx;
+  let colour = category ? category.colour : CATEGORY_COLOURS[0];
+  const swatches = h('div.chips');
+  const drawSwatches = () => mount(swatches, CATEGORY_COLOURS.map(c => h('button', {
+    type: 'button',
+    style: {
+      width: '30px', height: '30px', borderRadius: 'var(--r)', background: c,
+      border: c === colour ? '3px solid var(--ink)' : '1px solid var(--line)', cursor: 'pointer'
+    },
+    title: c,
+    onclick: () => { colour = c; drawSwatches(); }
+  })));
+  drawSwatches();
+
+  const form = h('div.stack', [
+    h('div.form-grid.form-grid--2', [
+      field({ label: 'Category name', name: 'name', required: true, autofocus: true,
+        value: category ? category.name : '', placeholder: 'Food' }),
+      field({ label: 'Name in Urdu', name: 'nameUr', urdu: true, value: category ? category.nameUr : '' })
+    ]),
+    field({ label: 'Sort order', name: 'sortOrder', type: 'number', value: category ? category.sortOrder : 0,
+      hint: 'Lower numbers appear first on the POS.' }),
+    h('div.field', [h('div.field__label', { text: 'Colour' }), swatches])
+  ]);
+
+  const dialog = modal({
+    title: category ? 'Edit category' : 'New category',
+    body: form,
+    footer: [
+      h('button.btn', { type: 'button', text: 'Cancel', onclick: () => dialog.close() }),
+      h('button.btn.btn--primary', { type: 'button', text: 'Save',
+        onclick: e => busy(e.currentTarget, async () => {
+          try {
+            await rest.saveCategory(store, Object.assign({ id: category ? category.id : '', colour }, formValues(form)));
+            toastOk('Category saved');
+            dialog.close(); app.refresh();
+          } catch (err) { applyErrors(form, err.fields); fail(err); }
+        }) })
+    ]
+  });
+}
+
+function menuItemForm(ctx, item) {
+  const { store, app } = ctx;
+  const categories = rest.listCategories(store);
+  if (!categories.length) {
+    toast('warn', 'Add a category first', 'Every menu item belongs to a category.');
+    return categoryForm(ctx, null);
+  }
+
+  const form = h('div.stack', [
+    h('div.form-grid.form-grid--3', [
+      field({ label: 'Item name', name: 'name', required: true, autofocus: true,
+        value: item ? item.name : '', placeholder: 'Trout Fish', span: 2 }),
+      field({ label: 'Name in Urdu', name: 'nameUr', urdu: true, value: item ? item.nameUr : '' }),
+      field({ label: 'Category', name: 'categoryId', type: 'select', required: true,
+        value: item ? item.categoryId : categories[0].id,
+        options: categories.map(c => ({ value: c.id, label: c.name })) }),
+      field({ label: 'Short code', name: 'code', mono: true, value: item ? item.code : '', placeholder: 'F01' }),
+      field({ label: 'Price', name: 'price', type: 'number', min: 0, required: true, value: item ? item.price : 0 }),
+      field({ label: 'Cost (optional)', name: 'cost', type: 'number', min: 0, value: item ? item.cost : 0,
+        hint: 'For your own margin figures' }),
+      field({ label: 'Sort order', name: 'sortOrder', type: 'number', value: item ? item.sortOrder : 0 })
+    ]),
+    checkbox({ label: 'Available on the menu right now', name: 'available', value: item ? item.available : true }),
+    field({ label: 'Description', name: 'description', type: 'textarea', rows: 2, value: item ? item.description : '' })
+  ]);
+
+  const dialog = modal({
+    title: item ? 'Edit menu item' : 'New menu item',
+    size: 'wide',
+    body: form,
+    footer: [
+      h('button.btn', { type: 'button', text: 'Cancel', onclick: () => dialog.close() }),
+      h('button.btn.btn--primary', { type: 'button', text: 'Save',
+        onclick: e => busy(e.currentTarget, async () => {
+          try {
+            await rest.saveMenuItem(store, Object.assign({ id: item ? item.id : '' }, formValues(form)));
+            toastOk('Menu item saved');
+            dialog.close(); app.refresh();
+          } catch (err) { applyErrors(form, err.fields); fail(err); }
+        }) })
+    ]
+  });
+}
+
+function tableForm(ctx, table) {
+  const { store, app } = ctx;
+  const areas = rest.areasOf(store);
+  const form = h('div.form-grid.form-grid--2', [
+    field({ label: 'Table number', name: 'code', required: true, mono: true, autofocus: true,
+      value: table ? table.code : '', placeholder: '1' }),
+    field({ label: 'Name (optional)', name: 'name', value: table ? table.name : '', placeholder: 'Corner booth' }),
+    field({ label: 'Seats', name: 'seats', type: 'number', min: 1, max: 40, value: table ? table.seats : 4 }),
+    field({ label: 'Area', name: 'area', value: table ? table.area : (areas[0] || rest.settings(store).defaultArea),
+      placeholder: 'Main hall', hint: areas.length ? 'Existing: ' + areas.join(', ') : null }),
+    field({ label: 'Shape', name: 'shape', type: 'select', value: table ? table.shape : 'square',
+      options: [{ value: 'square', label: 'Square' }, { value: 'round', label: 'Round' }, { value: 'rect', label: 'Rectangle' }] })
+  ]);
+
+  const dialog = modal({
+    title: table ? 'Edit table ' + table.code : 'New table',
+    body: form,
+    footer: [
+      h('button.btn', { type: 'button', text: 'Cancel', onclick: () => dialog.close() }),
+      h('button.btn.btn--primary', { type: 'button', text: 'Save',
+        onclick: e => busy(e.currentTarget, async () => {
+          try {
+            await rest.saveTable(store, Object.assign({ id: table ? table.id : '' }, formValues(form)));
+            toastOk('Table saved');
+            dialog.close(); app.refresh();
+          } catch (err) { applyErrors(form, err.fields); fail(err); }
+        }) })
+    ]
+  });
 }
 
 /* --------------------------------------------------------------- whatsapp */

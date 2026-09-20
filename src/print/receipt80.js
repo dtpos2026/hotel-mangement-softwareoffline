@@ -17,7 +17,7 @@
 
 import { printBase, escapeHtml, printerSettings, contentWidthMm } from './printer.js';
 import { formatMoney, toMoney } from '../core/money.js';
-import { formatDate, formatDateTime, nowIso } from '../core/dates.js';
+import { formatDate, formatDateTime, nowIso, formatTime } from '../core/dates.js';
 import { methodName } from '../domain/payments.js';
 import { maskCnic } from '../core/validate.js';
 
@@ -346,6 +346,98 @@ export function dayCloseSlip(store, ctx) {
   return wrap(receiptCss(s, compact), b.join(''));
 }
 
+/* ------------------------------------------------------------ restaurant */
+
+/**
+ * Kitchen slip.
+ *
+ * Deliberately not a receipt: no prices, no property branding, large item
+ * names and quantities, because it is read at arm's length in a hot kitchen.
+ * Only the newly sent items appear — a second slip must not re-cook the first.
+ */
+export function kitchenSlip(store, ctx) {
+  const s = printerSettings(store);
+  const compact = (ctx.mode || s.mode) === 'compact';
+  const { order, lines, where } = ctx;
+  const font = compact ? s.compactFontSizePt : s.fontSizePt;
+  const b = [];
+
+  b.push(`<div class="c b" style="font-size:${(font + 5).toFixed(1)}pt;letter-spacing:0.04em">KITCHEN</div>`);
+  b.push(`<div class="rule"></div>`);
+  b.push(`<div class="kv b" style="font-size:${(font + 3).toFixed(1)}pt"><span>${escapeHtml(where || '')}</span><span>${escapeHtml(order.code)}</span></div>`);
+  b.push(kv('Time', formatTime(nowIso())));
+  if (order.covers) b.push(kv('Covers', String(order.covers)));
+  if (order.waiter) b.push(kv('Waiter', order.waiter));
+  b.push(`<div class="rule"></div>`);
+
+  for (const line of lines) {
+    b.push(`<div class="kv b" style="font-size:${(font + 2).toFixed(1)}pt;margin-top:${compact ? 0.8 : 1.6}mm">
+      <span>${escapeHtml(line.name)}</span><span>x ${escapeHtml(String(line.qty))}</span></div>`);
+    if (line.notes) {
+      b.push(`<div style="font-size:${font.toFixed(1)}pt;padding-inline-start:3mm">** ${escapeHtml(line.notes)} **</div>`);
+    }
+  }
+
+  b.push(`<div class="rule"></div>`);
+  b.push(`<div class="c" style="font-size:${(font - 1).toFixed(1)}pt">${lines.length} item(s)</div>`);
+  b.push(`<div class="tail"></div>`);
+
+  return wrap(receiptCss(s, compact), b.join(''));
+}
+
+/** The guest's restaurant bill. */
+export function orderBill(store, ctx) {
+  const s = printerSettings(store);
+  const compact = (ctx.mode || s.mode) === 'compact';
+  const property = store.property;
+  const money = v => formatMoney(v, property.currency || 'Rs');
+  const { order, bill, where, paymentMethod } = ctx;
+  const b = [];
+
+  b.push(head(property, s, compact, 'Restaurant Bill'));
+  b.push(kv('Bill no', order.code));
+  b.push(kv('Date', formatDateTime(nowIso())));
+  b.push(kv('Table', where || '—'));
+  if (order.covers) b.push(kv('Covers', String(order.covers)));
+  if (order.waiter) b.push(kv('Served by', order.waiter));
+
+  b.push('<div class="gap"></div>');
+  b.push(`<table class="items"><thead><tr>
+      <th class="desc">Item</th><th class="n">Qty</th><th class="n">Amount</th>
+    </tr></thead><tbody>`);
+  for (const line of bill.lines) {
+    b.push(`<tr>
+      <td class="desc">${escapeHtml(line.name)}</td>
+      <td class="n num">${escapeHtml(String(line.qty))}</td>
+      <td class="n num">${escapeHtml(String(toMoney(line.amount).toLocaleString('en-US')))}</td>
+    </tr>`);
+    if (!compact && Number(line.qty) > 1) {
+      b.push(`<tr class="sub"><td class="desc" colspan="3">@ ${money(line.price)} each</td></tr>`);
+    }
+  }
+  b.push(`</tbody></table>`);
+  b.push(`<div class="rule"></div>`);
+
+  b.push(kv('Subtotal', money(bill.gross)));
+  if (bill.discount > 0) b.push(kv(bill.discountLabel || 'Discount', '\u2212 ' + money(bill.discount)));
+  if (bill.service > 0) b.push(kv(`Service ${bill.servicePercent}%`, money(bill.service)));
+  if (bill.taxAmount > 0) b.push(kv(`${bill.tax.name} ${bill.tax.percent}%`, money(bill.taxAmount)));
+
+  b.push(`<div class="rule"></div>`);
+  b.push(`<div class="kv total"><span>TOTAL</span><span class="num">${escapeHtml(money(bill.total))}</span></div>`);
+  b.push(`<div class="rule"></div>`);
+
+  if (order.postedToFolio) {
+    b.push(`<div class="c b">** CHARGED TO ROOM **</div>`);
+  } else if (order.status === 'paid') {
+    b.push(kv('Paid by', paymentMethod ? methodName(paymentMethod) : 'Cash'));
+    if (!compact) b.push(`<div class="c b" style="margin-top:1.5mm">** PAID — THANK YOU **</div>`);
+  }
+
+  b.push(foot(property, s, compact, ''));
+  return wrap(receiptCss(s, compact), b.join(''));
+}
+
 /* ----------------------------------------------------------------- test print */
 
 /**
@@ -394,4 +486,4 @@ export function testPrint(store, mode) {
   return wrap(receiptCss(s, compact), b.join(''));
 }
 
-export const RECEIPTS = { guestBill, paymentReceipt, checkInSlip, dayCloseSlip, testPrint };
+export const RECEIPTS = { guestBill, paymentReceipt, checkInSlip, dayCloseSlip, kitchenSlip, orderBill, testPrint };

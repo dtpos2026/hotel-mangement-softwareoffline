@@ -166,7 +166,8 @@ for (const [name, path] of uiModules) {
 }
 
 const screenIds = ['dashboard', 'units', 'calendar', 'reservations', 'checkin', 'inhouse',
-  'checkout', 'guests', 'register', 'payments', 'housekeeping', 'expenses', 'reports', 'closing', 'settings'];
+  'checkout', 'guests', 'register', 'payments', 'restaurant', 'housekeeping', 'expenses',
+  'reports', 'closing', 'settings'];
 const screenModules = {};
 for (const id of screenIds) {
   let mod = null, err = null;

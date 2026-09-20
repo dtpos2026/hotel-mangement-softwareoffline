@@ -7,7 +7,7 @@
  */
 
 import { h, mount, qs, busy } from '../dom.js';
-import { card, alert, field } from '../components.js';
+import { card, alert } from '../components.js';
 import { toast, ok as toastOk, fail } from '../feedback.js';
 import { checkPassword, DEFAULT_USERNAME, DEFAULT_PASSWORD, roleLabel } from '../../core/auth.js';
 

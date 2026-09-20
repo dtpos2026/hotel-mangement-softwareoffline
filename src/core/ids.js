@@ -35,7 +35,8 @@ export const SEQUENCES = {
   register:    { prefix: '',    pad: 4, yearly: true },  // the روزنامچہ serial: 2026-0088
   guest:       { prefix: 'G',   pad: 5, yearly: false },
   expense:     { prefix: 'EXP', pad: 4, yearly: true },
-  folio:       { prefix: 'F',   pad: 5, yearly: false }
+  folio:       { prefix: 'F',   pad: 5, yearly: false },
+  order:       { prefix: 'ORD', pad: 4, yearly: true }
 };
 
 function format(spec, year, n) {

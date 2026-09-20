@@ -703,3 +703,216 @@ p { margin: 0; }
 }
 
 @media print { .app, .toasts, .modal-backdrop { display: none !important; } }
+
+/* ==========================================================================
+   Module accents
+
+   Each area of the product gets its own hue. The chrome stays the aubergine
+   and brass the product was designed with; the colour appears where it helps
+   someone know at a glance which screen they are on, and never as decoration
+   competing with the status colours that carry real meaning.
+   ========================================================================== */
+
+:root {
+  --m-dashboard:   #3C096C;
+  --m-units:       #2C6E8F;
+  --m-calendar:    #0F766E;
+  --m-bookings:    #6D3B8E;
+  --m-checkin:     #1F3A2E;
+  --m-inhouse:     #2C6E8F;
+  --m-checkout:    #9A3412;
+  --m-guests:      #7C2D12;
+  --m-register:    #3C096C;
+  --m-payments:    #1F3A2E;
+  --m-restaurant:  #B3261E;
+  --m-housekeeping:#C98A16;
+  --m-expenses:    #7C2D12;
+  --m-reports:     #0F766E;
+  --m-closing:     #4B5563;
+  --m-settings:    #4B5563;
+}
+
+/* The active nav row is tinted with its module's hue. */
+.nav-item.is-active { border-left-color: var(--module, var(--accent)); }
+[dir="rtl"] .nav-item.is-active { border-right-color: var(--module, var(--accent)); }
+
+/* A coloured rule under the page title, so each screen reads as its own place. */
+.page__head { position: relative; }
+.page__title { display: inline-block; }
+.page__title::after {
+  content: '';
+  display: block;
+  height: 3px;
+  width: 38px;
+  margin-top: 7px;
+  border-radius: 99px;
+  background: var(--module, var(--accent));
+}
+
+/* KPI tiles pick up a hairline of their tone rather than a flat slab of it. */
+.kpi { position: relative; overflow: hidden; }
+.kpi::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--kpi-tone, transparent);
+}
+.kpi--ok::before     { background: var(--ok); }
+.kpi--due::before    { background: var(--due); }
+.kpi--river::before  { background: var(--river); }
+.kpi--accent::before { background: var(--accent); }
+.kpi--warn::before   { background: var(--warn); }
+.kpi--warn .kpi__value { color: #8A5B00; }
+
+/* Section headings carry a small dot in the module colour. */
+.card__title { display: inline-flex; align-items: center; gap: 8px; }
+.card--tinted .card__title::before {
+  content: '';
+  width: 7px; height: 7px; border-radius: 2px;
+  background: var(--module, var(--accent));
+  flex: 0 0 7px;
+}
+
+/* ==========================================================================
+   Restaurant
+   ========================================================================== */
+
+.table-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+  gap: 12px;
+}
+
+.table-card {
+  --tone: var(--ok);
+  position: relative;
+  text-align: start;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  padding: 12px 13px 11px;
+  min-height: 116px;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 90ms linear, box-shadow 90ms linear, transform 90ms linear;
+}
+.table-card::before {
+  content: '';
+  position: absolute; inset-inline-start: 0; top: 0; bottom: 0;
+  width: 4px; border-radius: var(--r-lg) 0 0 var(--r-lg);
+  background: var(--tone);
+}
+[dir="rtl"] .table-card::before { border-radius: 0 var(--r-lg) var(--r-lg) 0; }
+.table-card:hover { border-color: var(--tone); box-shadow: var(--shadow-rail); transform: translateY(-1px); }
+
+.table-card[data-status="free"]     { --tone: var(--ok); }
+.table-card[data-status="seated"]   { --tone: var(--river); background: var(--river-bg); }
+.table-card[data-status="billed"]   { --tone: var(--accent); background: var(--accent-tint); }
+.table-card[data-status="reserved"] { --tone: var(--warn); background: var(--warn-bg); }
+
+.table-card__top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.table-card__code {
+  font-family: var(--font-mono); font-size: 21px; font-weight: 700;
+  letter-spacing: -0.02em; color: var(--ink);
+}
+.table-card__seats {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 99px; padding: 1px 7px;
+}
+.table-card__status {
+  margin-top: 6px; font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--tone);
+}
+.table-card__meta { margin-top: 3px; font-size: 11.5px; color: var(--muted); }
+.table-card__total {
+  margin-top: auto; padding-top: 6px;
+  font-family: var(--font-mono); font-size: 14px; font-weight: 600;
+}
+.table-card__since { font-size: 10.5px; color: var(--muted-soft); font-family: var(--font-mono); }
+
+/* Table shape is shown by the corner radius rather than by distorting the
+   card. A true circle would squash the text and clip the status bar, which
+   costs more in legibility than the shape is worth. */
+.table-card[data-shape="round"] { border-radius: 26px; }
+.table-card[data-shape="round"]::before { border-radius: 26px 0 0 26px; }
+[dir="rtl"] .table-card[data-shape="round"]::before { border-radius: 0 26px 26px 0; }
+.table-card[data-shape="rect"] { border-radius: var(--r); }
+.table-card[data-shape="rect"]::before { border-radius: var(--r) 0 0 var(--r); }
+[dir="rtl"] .table-card[data-shape="rect"]::before { border-radius: 0 var(--r) var(--r) 0; }
+
+/* A small glyph makes the shape unambiguous even at a glance. */
+.table-card__seats::before {
+  content: '';
+  display: inline-block;
+  width: 7px; height: 7px;
+  margin-inline-end: 4px;
+  border: 1.5px solid currentColor;
+  vertical-align: 1px;
+}
+.table-card[data-shape="round"] .table-card__seats::before { border-radius: 50%; }
+.table-card[data-shape="rect"] .table-card__seats::before { width: 11px; height: 6px; border-radius: 1px; }
+
+/* Menu grid ------------------------------------------------------------- */
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+}
+.menu-item {
+  --cat: var(--accent);
+  text-align: start;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--cat);
+  border-radius: var(--r);
+  background: var(--surface);
+  padding: 10px 11px;
+  min-height: 78px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: background 90ms linear, border-color 90ms linear, transform 70ms linear;
+}
+.menu-item:hover { background: var(--surface-sunk); border-color: var(--line-strong); border-top-color: var(--cat); }
+.menu-item:active { transform: scale(0.97); }
+.menu-item__name { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.menu-item__ur { font-size: 11px; color: var(--muted); line-height: 1.8; }
+.menu-item__price {
+  margin-top: auto; font-family: var(--font-mono); font-size: 13px;
+  font-weight: 600; color: var(--cat);
+}
+
+/* Order lines ----------------------------------------------------------- */
+
+.order-lines { display: flex; flex-direction: column; }
+.order-line {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--line-soft);
+}
+.order-line__main { flex: 1; min-width: 0; }
+.order-line__name { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+.order-line__flag { color: var(--river); font-size: 11px; }
+.order-line__note { font-size: 11px; color: var(--warn); margin-top: 1px; }
+.order-line__qty { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; }
+.qty-btn {
+  width: 24px; height: 24px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--surface);
+  font-size: 15px; line-height: 1; color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+}
+.qty-btn:hover { background: var(--accent-tint); border-color: var(--accent); color: var(--accent); }
+.qty-val { min-width: 20px; text-align: center; font-size: 13px; font-weight: 600; }
+.order-line__amount { flex: 0 0 74px; text-align: end; font-size: 13px; font-weight: 600; }
+.order-line__x {
+  flex: 0 0 auto; width: 22px; height: 22px; border: 0; background: transparent;
+  color: var(--muted-soft); font-size: 16px; line-height: 1; border-radius: var(--r-sm);
+}
+.order-line__x:hover { background: var(--due-bg); color: var(--due); }
+
+@media (pointer: coarse) {
+  .qty-btn { width: 32px; height: 32px; font-size: 18px; }
+  .menu-item { min-height: 88px; }
+  .table-card { min-height: 128px; }
+}

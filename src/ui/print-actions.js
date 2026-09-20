@@ -8,13 +8,14 @@
  */
 
 import { h, mount } from './dom.js';
-import { modal, fail } from './feedback.js';
+import { modal, fail, ok as toastOk } from './feedback.js';
 import { segmented } from './components.js';
 import { openDocument, printerSettings } from '../print/printer.js';
 import * as host from '../core/host.js';
 import * as r80 from '../print/receipt80.js';
 import * as a4 from '../print/a4.js';
 import { billFor } from '../domain/folio.js';
+import { billFor as restaurantBill } from '../domain/restaurant.js';
 import { dayFigures } from '../domain/daily.js';
 import { listExpenses } from '../domain/expenses.js';
 
@@ -181,6 +182,48 @@ export function printDaySlip(store, date, figures) {
     subtitle: f.date,
     build: mode => r80.dayCloseSlip(store, { figures: f, closedBy: store.session.name, mode })
   });
+}
+
+/** Kitchen slip for the items just sent. */
+export function printKitchenSlip(store, order, lines) {
+  const where = orderWhere(store, order);
+  const ctx = { order, lines, where };
+  // The kitchen slip goes straight to the printer when a printer is set:
+  // nobody wants a preview between the order and the cook.
+  const s = printerSettings(store);
+  if (host.isDesktop && s.printerName && s.silentPrint) {
+    return printNow(store, r80.kitchenSlip(store, Object.assign({}, ctx, { mode: s.mode })))
+      .then(() => toastOk('Kitchen slip printed'))
+      .catch(err => fail(err, 'Could not print the kitchen slip'));
+  }
+  return preview(store, {
+    title: 'Kitchen slip',
+    subtitle: `${order.code} · ${lines.length} item(s)`,
+    build: mode => r80.kitchenSlip(store, Object.assign({}, ctx, { mode }))
+  });
+}
+
+export function printOrderBill(store, order) {
+  const bill = restaurantBill(store, order);
+  const ctx = { order, bill, where: orderWhere(store, order), paymentMethod: order.paymentMethod };
+  return preview(store, {
+    title: 'Restaurant bill — 80mm',
+    subtitle: order.code,
+    build: mode => r80.orderBill(store, Object.assign({}, ctx, { mode }))
+  });
+}
+
+function orderWhere(store, order) {
+  if (order.type === 'table') {
+    const table = store.db.get('tables', order.tableId);
+    return table ? 'Table ' + table.code : 'Table';
+  }
+  if (order.type === 'room') {
+    const stay = store.db.get('reservations', order.reservationId);
+    const unit = stay ? store.db.get('units', stay.unitId) : null;
+    return unit ? 'Room ' + unit.code : 'Room';
+  }
+  return 'Takeaway';
 }
 
 export function printTestPage(store) {

@@ -14,6 +14,7 @@ import { globalSearch } from '../domain/search.js';
 import { saveAutoBackup, shouldAutoBackup } from '../core/backup.js';
 import { arrivalsOn, departuresOn, inHouse } from '../domain/reservations.js';
 import { countByStatus } from '../domain/units.js';
+import { hasFeature } from '../core/host.js';
 import { outstanding } from '../domain/payments.js';
 
 export const SCREENS = [
@@ -27,6 +28,7 @@ export const SCREENS = [
   { id: 'guests',       label: 'Guests',       ur: 'مہمان',         perm: null },
   { id: 'register',     label: 'Register',     ur: 'روزنامچہ',      perm: 'view.register' },
   { id: 'payments',     label: 'Payments',     ur: 'وصولیاں',       perm: null },
+  { id: 'restaurant',   label: 'Restaurant',   ur: 'ریسٹورنٹ',      perm: null, module: 'restaurant' },
   { id: 'housekeeping', label: 'Housekeeping', ur: 'صفائی',         perm: 'housekeeping.update' },
   { id: 'expenses',     label: 'Expenses',     ur: 'اخراجات',       perm: 'expense.create' },
   { id: 'reports',      label: 'Reports',      ur: 'رپورٹس',        perm: 'view.reports' },
@@ -74,7 +76,16 @@ export class App {
   }
 
   visibleScreens() {
-    return SCREENS.filter(s => !s.perm || this.store.session.can(s.perm));
+    return SCREENS.filter(s => {
+      if (s.perm && !this.store.session.can(s.perm)) return false;
+      // Optional modules only appear once the property switches them on and
+      // the licence allows them.
+      if (s.module === 'restaurant') {
+        if (!this.store.setting('restaurant').enabled) return false;
+        if (!hasFeature('restaurant') && !hasFeature('reports')) return false;
+      }
+      return true;
+    });
   }
 
   /* --- badges on the nav ------------------------------------------------- */
@@ -88,7 +99,10 @@ export class App {
       checkout: departuresOn(store, d).filter(r => r.status === 'checked_in').length,
       inhouse: inHouse(store).length,
       housekeeping: (status.cleaning || 0),
-      payments: outstanding(store).length
+      payments: outstanding(store).length,
+      restaurant: store.setting('restaurant').enabled
+        ? store.db.all('orders').filter(o => ['open', 'served', 'billed'].indexOf(o.status) > -1).length
+        : 0
     };
   }
 
@@ -101,6 +115,10 @@ export class App {
 
     const counts = this.navCounts();
     const property = store.property;
+
+    // Each screen sets --module, which tints the active nav row, the rule under
+    // the page title and any section marked as tinted.
+    document.documentElement.style.setProperty('--module', `var(--m-${this.screen}, var(--accent))`);
 
     const app = h('div.app', { dataset: { nav: 'closed' } }, [
       this.sidebar(counts, property),
@@ -149,6 +167,7 @@ export class App {
         return h('button.nav-item', {
           type: 'button',
           class: s.id === this.screen ? 'is-active' : null,
+          style: { '--module': `var(--m-${s.id}, var(--accent))` },
           onclick: () => this.go(s.id)
         }, [
           h('span', { text: s.label }),

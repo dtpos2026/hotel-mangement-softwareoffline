@@ -24,7 +24,14 @@ export const COLLECTIONS = [
   'users',
   'settings',      // singleton rows keyed by id
   'counters',      // sequence counters
-  'auditLog'
+  'auditLog',
+  // Restaurant module. Present in every database so a property can switch it
+  // on later without a migration; empty costs nothing.
+  'menuCategories',
+  'menuItems',
+  'tables',
+  'orders',
+  'orderLines'
 ];
 
 /* ---------------------------------------------------------------- vocabulary */
@@ -83,6 +90,34 @@ export const PAYMENT_METHODS = [
   { id: 'bank',      label: 'Bank',       labelUr: 'بینک' },
   { id: 'card',      label: 'Card',       labelUr: 'کارڈ' },
   { id: 'other',     label: 'Other',      labelUr: 'دیگر' }
+];
+
+/** Where a restaurant order is being served. */
+export const ORDER_TYPES = [
+  { id: 'table',    label: 'Table',     labelUr: 'میز' },
+  { id: 'room',     label: 'Room',      labelUr: 'کمرہ' },
+  { id: 'takeaway', label: 'Takeaway',  labelUr: 'ٹیک اوے' }
+];
+
+export const ORDER_STATUS = [
+  { id: 'open',      label: 'Open',      labelUr: 'جاری',    color: 'var(--warn)' },
+  { id: 'served',    label: 'Served',    labelUr: 'پیش',     color: 'var(--river)' },
+  { id: 'billed',    label: 'Billed',    labelUr: 'بل',      color: 'var(--accent)' },
+  { id: 'paid',      label: 'Paid',      labelUr: 'ادا',     color: 'var(--ok)' },
+  { id: 'cancelled', label: 'Cancelled', labelUr: 'منسوخ',   color: 'var(--muted)' }
+];
+
+export const TABLE_STATUS = [
+  { id: 'free',     label: 'Free',     labelUr: 'خالی',   color: 'var(--ok)' },
+  { id: 'seated',   label: 'Seated',   labelUr: 'مصروف',  color: 'var(--river)' },
+  { id: 'billed',   label: 'Billed',   labelUr: 'بل',     color: 'var(--accent)' },
+  { id: 'reserved', label: 'Reserved', labelUr: 'محفوظ',  color: 'var(--warn)' }
+];
+
+/** Colours a menu category can be tagged with, for the POS grid. */
+export const CATEGORY_COLOURS = [
+  '#3C096C', '#2C6E8F', '#1F3A2E', '#B3261E', '#C98A16',
+  '#6D3B8E', '#0F766E', '#9A3412', '#4B5563', '#7C2D12'
 ];
 
 export const CHARGE_CATEGORIES = [
@@ -166,6 +201,14 @@ export function defaultSettings() {
       requireCnic: true,
       autoDirtyOnCheckout: true,
       allowOverbook: false     // never enabled by the UI; present so the rule is explicit
+    },
+    {
+      id: 'restaurant',
+      enabled: false,
+      serviceChargePercent: 0,
+      printKitchenSlip: true,
+      allowPostToRoom: true,
+      defaultArea: 'Main hall'
     },
     {
       id: 'app',
@@ -272,6 +315,63 @@ export function makeExpense(patch) {
   }, patch || {});
 }
 
+/* ------------------------------------------------------------- restaurant */
+
+export function makeMenuCategory(patch) {
+  return Object.assign({
+    id: '', name: '', nameUr: '', colour: CATEGORY_COLOURS[0],
+    sortOrder: 0, active: true,
+    createdAt: new Date().toISOString(), archivedAt: null
+  }, patch || {});
+}
+
+export function makeMenuItem(patch) {
+  return Object.assign({
+    id: '', code: '', name: '', nameUr: '', categoryId: '',
+    price: 0, cost: 0, description: '',
+    available: true, sortOrder: 0,
+    createdAt: new Date().toISOString(), archivedAt: null
+  }, patch || {});
+}
+
+export function makeTable(patch) {
+  return Object.assign({
+    id: '', code: '', name: '', seats: 4, area: 'Main hall',
+    shape: 'square',            // square | round | rect — used by the floor view
+    x: 0, y: 0,                 // grid position on the floor plan
+    status: 'free', active: true,
+    createdAt: new Date().toISOString(), archivedAt: null
+  }, patch || {});
+}
+
+export function makeOrder(patch) {
+  return Object.assign({
+    id: '', code: '', type: 'table',
+    tableId: '', reservationId: '', guestName: '',
+    covers: 1, waiter: '',
+    status: 'open',
+    discount: 0, discountType: 'amount',
+    notes: '',
+    openedAt: new Date().toISOString(), openedBy: '',
+    servedAt: null, billedAt: null, closedAt: null, closedBy: '',
+    postedToFolio: false, folioLineId: '',
+    cancelledAt: null, cancelReason: ''
+  }, patch || {});
+}
+
+export function makeOrderLine(patch) {
+  return Object.assign({
+    id: '', orderId: '', menuItemId: '',
+    name: '', nameUr: '', categoryId: '',
+    qty: 1, price: 0, amount: 0,
+    notes: '',                  // "no chilli", "well done"
+    status: 'pending',          // pending | sent | served | cancelled
+    sentAt: null, addedBy: '',
+    createdAt: new Date().toISOString(),
+    voided: false, voidReason: ''
+  }, patch || {});
+}
+
 export function makeMaintenance(patch) {
   return Object.assign({
     id: '', unitId: '', reason: '', startDate: '', expectedEnd: '',
@@ -325,6 +425,13 @@ export function reservationStatusOf(id) {
 export function hkStatusOf(id) {
   return HK_STATUS.find(s => s.id === id) || HK_STATUS[0];
 }
+export function orderStatusOf(id) {
+  return ORDER_STATUS.find(s => s.id === id) || ORDER_STATUS[0];
+}
+export function tableStatusOf(id) {
+  return TABLE_STATUS.find(s => s.id === id) || TABLE_STATUS[0];
+}
+
 export function methodLabel(id) {
   const m = PAYMENT_METHODS.find(x => x.id === id);
   return m ? m.label : (id || 'Other');

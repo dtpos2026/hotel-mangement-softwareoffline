@@ -15,6 +15,7 @@ import { addCharge } from '../domain/folio.js';
 import { recordPayment } from '../domain/payments.js';
 import { recordExpense } from '../domain/expenses.js';
 import { setHkStatus } from '../domain/housekeeping.js';
+import { saveCategory, saveMenuItem, saveTable, openOrder, addLine, sendToKitchen } from '../domain/restaurant.js';
 import { today, addDays } from './dates.js';
 
 export async function seedDemoData(store) {
@@ -153,6 +154,65 @@ export async function seedDemoData(store) {
   await recordExpense(store, { date: d, category: 'Electricity', description: 'WAPDA bill', amount: 12000, method: 'cash', paidTo: 'WAPDA' });
   await recordExpense(store, { date: d, category: 'Supplies', description: 'Towels and soap', amount: 3500, method: 'cash', paidTo: 'Swat Traders' });
   await recordExpense(store, { date: addDays(d, -1), category: 'Staff salary', description: 'Housekeeping advance', amount: 8000, method: 'cash' });
+
+  /* The restaurant, switched on so the module can be seen. A property that
+     does not want it turns it off in Settings and the nav entry disappears. */
+  await store.updateSetting('restaurant', { enabled: true, serviceChargePercent: 0 });
+
+  const catFood = await saveCategory(store, { name: 'Food', nameUr: 'کھانا', sortOrder: 1 });
+  const catBbq = await saveCategory(store, { name: 'BBQ', nameUr: 'باربی کیو', sortOrder: 2 });
+  const catDrinks = await saveCategory(store, { name: 'Drinks', nameUr: 'مشروبات', sortOrder: 3 });
+  const catBreakfast = await saveCategory(store, { name: 'Breakfast', nameUr: 'ناشتہ', sortOrder: 4 });
+
+  const menu = [
+    ['F01', 'Trout Fish', 'ٹراؤٹ مچھلی', catFood, 2650],
+    ['F02', 'Chicken Karahi', 'چکن کڑاہی', catFood, 1850],
+    ['F03', 'Mutton Karahi', 'مٹن کڑاہی', catFood, 2400],
+    ['F04', 'Daal Mash', 'دال ماش', catFood, 650],
+    ['F05', 'Mixed Vegetable', 'مکس سبزی', catFood, 550],
+    ['F06', 'Roti', 'روٹی', catFood, 30],
+    ['F07', 'Naan', 'نان', catFood, 60],
+    ['B01', 'Chapli Kabab', 'چپلی کباب', catBbq, 900],
+    ['B02', 'Seekh Kabab', 'سیخ کباب', catBbq, 750],
+    ['B03', 'Chicken Tikka', 'چکن تکہ', catBbq, 850],
+    ['D01', 'Chai', 'چائے', catDrinks, 150],
+    ['D02', 'Kashmiri Chai', 'کشمیری چائے', catDrinks, 250],
+    ['D03', 'Fresh Lime', 'تازہ لیموں', catDrinks, 200],
+    ['D04', 'Mineral Water', 'منرل واٹر', catDrinks, 100],
+    ['K01', 'Halwa Puri', 'حلوہ پوری', catBreakfast, 450],
+    ['K02', 'Omelette', 'آملیٹ', catBreakfast, 300],
+    ['K03', 'Paratha', 'پراٹھا', catBreakfast, 120]
+  ];
+  const menuItems = {};
+  for (const [code, name, nameUr, cat, price] of menu) {
+    menuItems[code] = await saveMenuItem(store, { code, name, nameUr, categoryId: cat.id, price });
+  }
+
+  const tableSpecs = [
+    ['1', 4, 'Main hall', 'square'], ['2', 2, 'Main hall', 'square'],
+    ['3', 6, 'Main hall', 'rect'],   ['4', 4, 'Main hall', 'round'],
+    ['5', 4, 'Main hall', 'square'], ['6', 8, 'Main hall', 'rect'],
+    ['L1', 6, 'Lawn', 'round'],      ['L2', 6, 'Lawn', 'round'],
+    ['L3', 4, 'Lawn', 'square'],     ['T1', 2, 'Terrace', 'square'],
+    ['T2', 2, 'Terrace', 'square']
+  ];
+  const tables = {};
+  for (const [code, seats, area, shape] of tableSpecs) {
+    tables[code] = await saveTable(store, { code, seats, area, shape });
+  }
+
+  // One table mid-service and one waiting for its bill, so the floor plan is
+  // not a wall of empty squares on the first run.
+  const lunch = await openOrder(store, { type: 'table', tableId: tables['3'].id, covers: 5, waiter: 'Imran' });
+  await addLine(store, lunch.id, { menuItemId: menuItems.F01.id, qty: 2 });
+  await addLine(store, lunch.id, { menuItemId: menuItems.B01.id, qty: 3 });
+  await addLine(store, lunch.id, { menuItemId: menuItems.F06.id, qty: 8 });
+  await addLine(store, lunch.id, { menuItemId: menuItems.D01.id, qty: 5, notes: 'less sugar' });
+  await sendToKitchen(store, lunch.id);
+
+  const tea = await openOrder(store, { type: 'table', tableId: tables.L1.id, covers: 2, waiter: 'Shahid' });
+  await addLine(store, tea.id, { menuItemId: menuItems.D02.id, qty: 2 });
+  await addLine(store, tea.id, { menuItemId: menuItems.K03.id, qty: 2 });
 
   await store.updateSetting('app', { demoDataLoaded: true });
   await store.db.flush();

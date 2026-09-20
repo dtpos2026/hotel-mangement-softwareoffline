@@ -6,9 +6,9 @@
  * understands what a ban costs.
  */
 
-import { h, mount, qs, busy } from './dom.js';
-import { card, alert, field, badge, railRows } from './components.js';
-import { modal, toast, ok as toastOk, fail, confirm } from './feedback.js';
+import { h, mount, busy } from './dom.js';
+import { card, alert, badge, railRows } from './components.js';
+import { modal, toast, ok as toastOk, confirm } from './feedback.js';
 import * as host from '../core/host.js';
 import { buildMessage, TEMPLATES } from '../domain/messaging.js';
 
