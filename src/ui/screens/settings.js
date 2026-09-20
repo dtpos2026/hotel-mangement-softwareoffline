@@ -11,8 +11,9 @@ import { ROLES, roleLabel, hashPassword, newSalt, permissionsFor, PERMISSIONS, c
 import { buildBackup, backupFilename, validateBackup, restoreBackup, readAutoBackups, saveAutoBackup, downloadFile, readFileAsText } from '../../core/backup.js';
 import { formatDateTime, nowIso } from '../../core/dates.js';
 import { newId } from '../../core/ids.js';
-import { printTestPage } from '../print-actions.js';
+import { printTestPage, printSample } from '../print-actions.js';
 import { printerSettings, contentWidthMm } from '../../print/printer.js';
+import { templateList, sampleReceipt } from '../../print/receipt80.js';
 import * as host from '../../core/host.js';
 import { activationCard } from './activation.js';
 import { whatsappPanel } from '../whatsapp.js';
@@ -225,6 +226,12 @@ function printingTab(ctx) {
         value: s.silentPrint, disabled: !canEdit }) : null
     ])),
 
+    card({ title: 'Receipt design', note: 'logo, name and address' }, h('div.stack', [
+      h('div.field__hint', { text: 'The figures and the columns are the same in every design — only the letterhead changes. The logo and address come from Settings › Property.' }),
+      h('div', { id: 'designBox' }),
+      h('div', { id: 'designPreview' })
+    ])),
+
     card({ title: 'Test and preview' }, h('div.stack', [
       h('div.row', [
         h('button.btn.btn--primary', { type: 'button', text: 'Test print', onclick: () => printTestPage(store) }),
@@ -281,12 +288,57 @@ function printingTab(ctx) {
     hint.textContent = `${printers.length} printer(s) found. Receipts print straight to this one.`;
   }, 0);
 
+  // Receipt design: a card per template, and a real 80mm receipt rendered
+  // beside them so the choice is made by looking rather than by guessing.
+  let template = templateList().some(t => t.key === s.template) ? s.template : 'classic';
+  setTimeout(() => {
+    const box = qs('#designBox', form);
+    const preview = qs('#designPreview', form);
+    if (!box || !preview) return;
+
+    const drawPreview = () => {
+      const paper = printerSettings(store).widthMm;
+      mount(preview, h('div.receipt-preview', [
+        h('div.receipt-preview__head', [
+          h('span.text-xs.text-muted', { text: paper + 'mm paper · ' + (mode === 'compact' ? 'compact' : 'normal') + ' mode · sample figures' }),
+          h('button.btn.btn--sm.btn--ghost', { type: 'button', text: 'Print this sample',
+            onclick: () => printSample(store, { template, mode }) })
+        ]),
+        h('div.receipt-preview__paper', [
+          h('iframe.receipt-preview__frame', {
+            title: 'Receipt preview',
+            srcdoc: sampleReceipt(store, { template, mode })
+          })
+        ])
+      ]));
+    };
+
+    const drawPicker = () => {
+      mount(box, h('div.design-grid', templateList().map(t =>
+        h('button.design-card', {
+          type: 'button',
+          disabled: !canEdit,
+          class: t.key === template ? 'is-active' : null,
+          onclick: () => { template = t.key; drawPicker(); drawPreview(); }
+        }, [
+          h('span.design-card__name', { text: t.label }),
+          h('span.design-card__note', { text: t.note })
+        ]))));
+    };
+
+    drawPicker();
+    drawPreview();
+    // Switching Normal/Compact should be visible here too.
+    previewRedraw = drawPreview;
+  }, 0);
+
+  let previewRedraw = null;
   let mode = s.mode;
   setTimeout(() => {
     const box = qs('#modeBox', form);
     const draw = () => mount(box, segmented({
       options: [{ value: 'normal', label: 'Normal' }, { value: 'compact', label: 'Compact — save paper' }],
-      value: mode, onChange: v => { mode = v; draw(); }
+      value: mode, onChange: v => { mode = v; draw(); if (previewRedraw) previewRedraw(); }
     }));
     if (box) draw();
   }, 0);
@@ -301,7 +353,7 @@ function printingTab(ctx) {
         onclick: e => busy(e.currentTarget, async () => {
           const v = formValues(form);
           try {
-            await store.updateSetting('printer', Object.assign({}, v, { mode, printerName }));
+            await store.updateSetting('printer', Object.assign({}, v, { mode, printerName, template }));
             toastOk('Printer settings saved', `${v.widthMm}mm · ${contentWidthMm(printerSettings(store))}mm print area`);
             app.refresh();
           } catch (err) { fail(err); }

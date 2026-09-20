@@ -441,6 +441,69 @@ ok('the existing data is untouched after a failed restore', badRestore.before ==
 
 /* ------------------------------------------------------------ permissions */
 
+/* ------------------------------------------------- the receipt design picker */
+
+suite('Choosing a receipt design');
+
+await go('settings');
+await page.evaluate(() => {
+  const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Receipt & printer');
+  if (b) b.click();
+});
+await page.waitForTimeout(900);
+
+ok('every design is offered as a card', await page.locator('.design-card').count() === 4);
+ok('one design is marked as the current one', await page.locator('.design-card.is-active').count() === 1);
+ok('the current design is the saved one',
+  (await page.locator('.design-card.is-active .design-card__name').innerText()) === 'Classic');
+ok('a real receipt is previewed beside them', await page.locator('.receipt-preview__frame').count() === 1);
+
+const previewHas = (needle) => page.evaluate(n => {
+  const f = document.querySelector('.receipt-preview__frame');
+  return (f.contentDocument.body.innerHTML || '').includes(n);
+}, needle);
+
+ok('the preview shows the real property name', await previewHas('Kalam Continental'));
+ok('the preview is the classic design to begin with', !(await previewHas('class="band"')));
+
+await page.locator('.design-card', { hasText: 'Banded' }).click();
+await page.waitForTimeout(500);
+ok('choosing a design moves the marker',
+  (await page.locator('.design-card.is-active .design-card__name').innerText()) === 'Banded');
+ok('the preview redraws in the chosen design', await previewHas('class="band"'));
+ok('the preview keeps the real property name', await previewHas('Kalam Continental'));
+
+ok('nothing is saved until the button is pressed',
+  (await page.evaluate(() => window.__hms.store.setting('printer').template)) === 'classic');
+
+// Compact is a separate control, and the preview has to follow it too.
+await page.locator('#modeBox button', { hasText: 'Compact' }).click();
+await page.waitForTimeout(500);
+ok('switching to compact redraws the preview as well', await previewHas('class="band"'));
+
+await page.locator('#modeBox button', { hasText: 'Normal' }).click();
+await page.waitForTimeout(400);
+
+await page.locator('button', { hasText: 'Save printer settings' }).click();
+await page.waitForTimeout(1200);
+ok('saving stores the chosen design',
+  (await page.evaluate(() => window.__hms.store.setting('printer').template)) === 'banded');
+ok('saving leaves the paper geometry alone',
+  (await page.evaluate(() => window.__hms.store.setting('printer').widthMm)) === 80);
+await clearToasts();
+
+// And the design has to reach a receipt that is actually printed.
+const printed = await page.evaluate(async () => {
+  const r80 = await import('/src/print/receipt80.js');
+  return r80.sampleReceipt(window.__hms.store);
+});
+ok('a printed receipt uses the saved design', printed.includes('class="band"'));
+ok('...and still carries the address', printed.includes('Kalam'));
+
+await page.evaluate(() => window.__hms.store.updateSetting('printer',
+  Object.assign({}, window.__hms.store.setting('printer'), { template: 'classic' })));
+await page.waitForTimeout(400);
+
 suite('Role permissions in the UI');
 const asReception = await page.evaluate(async () => {
   const s = window.__hms.store;

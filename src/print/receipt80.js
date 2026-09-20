@@ -21,6 +21,38 @@ import { formatDate, formatDateTime, nowIso, formatTime } from '../core/dates.js
 import { methodName } from '../domain/payments.js';
 import { maskCnic } from '../core/validate.js';
 
+/* --------------------------------------------------------------- templates */
+
+/**
+ * The four letterhead designs. They change the head and the sign-off; the
+ * figures, the columns and the totals are the same in all of them, so a
+ * property can pick a look without any number moving.
+ */
+export const TEMPLATES = {
+  classic: {
+    label: 'Classic',
+    note: 'Centred name over the address, ruled above and below the document title.'
+  },
+  banded: {
+    label: 'Banded',
+    note: 'The property name reversed out of a solid black band. The most visible on cheap paper.'
+  },
+  letterhead: {
+    label: 'Letterhead',
+    note: 'Logo beside the address block, as a printed letterhead sits. Needs a logo.'
+  },
+  minimal: {
+    label: 'Minimal',
+    note: 'The shortest header there is — saves roughly a centimetre of paper on every receipt.'
+  }
+};
+
+export const DEFAULT_TEMPLATE = 'classic';
+
+export function templateList() {
+  return Object.keys(TEMPLATES).map(key => Object.assign({ key }, TEMPLATES[key]));
+}
+
 /* ------------------------------------------------------------------- style */
 
 function receiptCss(s, compact) {
@@ -29,6 +61,9 @@ function receiptCss(s, compact) {
   const lh = compact ? 1.24 : 1.45;
   const gap = compact ? 1.4 : 3.4;          // mm between blocks
   const rulePad = compact ? 0.8 : 1.8;      // mm around a rule
+  // The letterhead logo shares the line with the address, so it is capped at
+  // a third of the paper however large the logo setting is.
+  const lhLogo = Math.round(Math.min(s.logoSizePx, width * 3.78 / 3));
 
   return `
     ${printBase()}
@@ -74,26 +109,134 @@ function receiptCss(s, compact) {
     .foot { font-size: ${(font - 1.5).toFixed(1)}pt; text-align: center; line-height: ${compact ? 1.25 : 1.4}; }
     .tail { height: ${compact ? 4 : 9}mm; }
     .words { font-size: ${(font - 1.5).toFixed(1)}pt; font-style: italic; }
+
+    /* -------- letterhead templates -------- */
+
+    .doctitle {
+      text-align: center; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .doctitle--plain { letter-spacing: 0.04em; font-size: ${(font - 0.5).toFixed(1)}pt; }
+
+    /* Reversed type needs a solid fill, which print-color-adjust already
+       forces; thermal heads render it as plain black with white gaps. */
+    .band {
+      background: #000; color: #fff;
+      text-align: center; font-weight: 700;
+      font-size: ${(font + (compact ? 2 : 3)).toFixed(1)}pt;
+      letter-spacing: 0.01em; line-height: 1.3;
+      padding: ${compact ? 0.8 : 1.4}mm 1.5mm;
+      margin-bottom: ${compact ? 0.8 : 1.4}mm;
+      word-break: break-word;
+    }
+
+    .rule--heavy { border-top-width: 2px; }
+
+    /* The logo column is given an explicit width: an SVG logo has no intrinsic
+       size, and a flex item with none collapses to nothing. */
+    .lh { display: flex; align-items: center; gap: 2.5mm; }
+    .lh__logo { flex: 0 0 ${lhLogo}px; }
+    .lh__logo .logo {
+      margin: 0; width: ${lhLogo}px; height: auto;
+      max-width: ${lhLogo}px; max-height: ${lhLogo}px;
+    }
+    .lh__text { flex: 1 1 auto; min-width: 0; }
+    .title--left { text-align: left; font-size: ${(font + (compact ? 1.5 : 2)).toFixed(1)}pt; }
+    .sub--left { text-align: left; }
   `;
 }
 
 /* -------------------------------------------------------------- fragments */
 
+/**
+ * The parts of a letterhead, assembled differently by each template.
+ * Everything here is optional: a property with no logo and no address still
+ * prints a correct receipt, just a shorter one.
+ */
+function headParts(property, settings) {
+  const logo = (settings.showLogo && property.logo)
+    ? `<img class="logo" src="${escapeHtml(property.logo)}" alt="" />` : '';
+  const address = [property.address, property.city].filter(Boolean).join(', ');
+  const contact = [
+    property.phone,
+    property.whatsapp && property.whatsapp !== property.phone ? 'WA ' + property.whatsapp : ''
+  ].filter(Boolean).join('  ·  ');
+  const extra = [property.email, property.ntn ? 'NTN ' + property.ntn : ''].filter(Boolean).join('  ·  ');
+  return { logo, name: property.name || 'Property', address, contact, extra };
+}
+
+/**
+ * The receipt letterhead, in one of four designs.
+ *
+ * They differ only above the document title — the body of every receipt is
+ * identical, so a property can change its look without any figure moving. The
+ * designs stay within what a thermal head prints cleanly: solid black, one
+ * weight of rule, no greys and no fine hairlines.
+ */
 function head(property, settings, compact, docTitle) {
+  const t = TEMPLATES[settings.template] ? settings.template : DEFAULT_TEMPLATE;
+  const p = headParts(property, settings);
   const bits = [];
-  if (settings.showLogo && property.logo) {
-    bits.push(`<img class="logo" src="${escapeHtml(property.logo)}" alt="" />`);
+  const title = `<div class="doctitle">${escapeHtml(docTitle)}</div>`;
+
+  if (t === 'banded') {
+    // The name reversed out of a solid band — the most visible on cheap paper.
+    if (p.logo) bits.push(p.logo);
+    bits.push(`<div class="band">${escapeHtml(p.name)}</div>`);
+    if (p.address) bits.push(`<div class="sub">${escapeHtml(p.address)}</div>`);
+    if (p.contact) bits.push(`<div class="sub num">${escapeHtml(p.contact)}</div>`);
+    if (p.extra) bits.push(`<div class="sub num">${escapeHtml(p.extra)}</div>`);
+    if (!compact) bits.push('<div class="gap"></div>');
+    bits.push(title);
+    bits.push('<div class="rule"></div>');
+
+  } else if (t === 'letterhead') {
+    // Logo beside the address block, the way a printed letterhead sits.
+    if (p.logo) {
+      bits.push(
+        '<div class="lh">' +
+          `<div class="lh__logo">${p.logo}</div>` +
+          '<div class="lh__text">' +
+            `<div class="title title--left">${escapeHtml(p.name)}</div>` +
+            (p.address ? `<div class="sub sub--left">${escapeHtml(p.address)}</div>` : '') +
+            (p.contact ? `<div class="sub sub--left num">${escapeHtml(p.contact)}</div>` : '') +
+            (p.extra ? `<div class="sub sub--left num">${escapeHtml(p.extra)}</div>` : '') +
+          '</div>' +
+        '</div>'
+      );
+    } else {
+      // No logo: centre it rather than leave an empty column.
+      bits.push(`<div class="title">${escapeHtml(p.name)}</div>`);
+      if (p.address) bits.push(`<div class="sub">${escapeHtml(p.address)}</div>`);
+      if (p.contact) bits.push(`<div class="sub num">${escapeHtml(p.contact)}</div>`);
+      if (p.extra) bits.push(`<div class="sub num">${escapeHtml(p.extra)}</div>`);
+    }
+    bits.push('<div class="rule rule--heavy"></div>');
+    bits.push(title);
+    bits.push('<div class="rule"></div>');
+
+  } else if (t === 'minimal') {
+    // The shortest header there is — for properties printing all day.
+    if (p.logo) bits.push(p.logo);
+    bits.push(`<div class="title">${escapeHtml(p.name)}</div>`);
+    const oneLine = [p.address, p.contact].filter(Boolean).join('  ·  ');
+    if (oneLine) bits.push(`<div class="sub">${escapeHtml(oneLine)}</div>`);
+    bits.push('<div class="rule--sub"></div>');
+    bits.push(`<div class="doctitle doctitle--plain">${escapeHtml(docTitle)}</div>`);
+
+  } else {
+    // Classic: the design the rest of the product was drawn around.
+    if (p.logo) bits.push(p.logo);
+    bits.push(`<div class="title">${escapeHtml(p.name)}</div>`);
+    if (p.address) bits.push(`<div class="sub">${escapeHtml(p.address)}</div>`);
+    if (p.contact) bits.push(`<div class="sub num">${escapeHtml(p.contact)}</div>`);
+    if (p.extra) bits.push(`<div class="sub num">${escapeHtml(p.extra)}</div>`);
+    if (!compact) bits.push('<div class="gap"></div>');
+    bits.push('<div class="rule"></div>');
+    bits.push(title);
+    bits.push('<div class="rule"></div>');
   }
-  bits.push(`<div class="title">${escapeHtml(property.name || 'Property')}</div>`);
-  const line2 = [property.address, property.city].filter(Boolean).join(', ');
-  if (line2) bits.push(`<div class="sub">${escapeHtml(line2)}</div>`);
-  const contact = [property.phone, property.whatsapp && property.whatsapp !== property.phone ? 'WA ' + property.whatsapp : '']
-    .filter(Boolean).join('  ·  ');
-  if (contact) bits.push(`<div class="sub num">${escapeHtml(contact)}</div>`);
-  if (!compact) bits.push('<div class="gap"></div>');
-  bits.push(`<div class="rule"></div>`);
-  bits.push(`<div class="c b" style="letter-spacing:0.06em;text-transform:uppercase">${escapeHtml(docTitle)}</div>`);
-  bits.push(`<div class="rule"></div>`);
+
   return bits.join('');
 }
 
@@ -102,12 +245,29 @@ function kv(label, value, cls) {
 }
 
 function foot(property, settings, compact, extra) {
-  const bits = [`<div class="rule"></div>`];
+  const t = TEMPLATES[settings.template] ? settings.template : DEFAULT_TEMPLATE;
+  const bits = [];
+
+  // Minimal signs off with a thin rule; the rest with a full one, and the
+  // letterhead closes with the same heavy rule it opened with.
+  bits.push(t === 'minimal' ? '<div class="rule--sub"></div>'
+    : t === 'letterhead' ? '<div class="rule rule--heavy"></div>'
+    : '<div class="rule"></div>');
+
   if (extra) bits.push(`<div class="foot">${extra}</div>`);
-  if (property.receiptFooter) bits.push(`<div class="foot">${escapeHtml(property.receiptFooter)}</div>`);
-  if (!compact) bits.push('<div class="gap"></div>');
-  bits.push(`<div class="foot" style="opacity:0.75">Software by Digital Target</div>`);
-  bits.push(`<div class="tail"></div>`);
+  if (property.receiptFooter) {
+    bits.push(t === 'banded'
+      ? `<div class="foot b">${escapeHtml(property.receiptFooter)}</div>`
+      : `<div class="foot">${escapeHtml(property.receiptFooter)}</div>`);
+  }
+
+  // Minimal exists to save paper, so it does not spend a line on our name.
+  if (t !== 'minimal') {
+    if (!compact) bits.push('<div class="gap"></div>');
+    bits.push('<div class="foot" style="opacity:0.75">Software by Digital Target</div>');
+  }
+
+  bits.push('<div class="tail"></div>');
   return bits.join('');
 }
 
@@ -487,3 +647,64 @@ export function testPrint(store, mode) {
 }
 
 export const RECEIPTS = { guestBill, paymentReceipt, checkInSlip, dayCloseSlip, kitchenSlip, orderBill, testPrint };
+
+/* ------------------------------------------------------------- design preview */
+
+/**
+ * A representative guest bill, for choosing a receipt design without printing
+ * a tree's worth of paper.
+ *
+ * The property details are the real ones — logo, name, address, phone, footer
+ * — because those are what differ between designs. Only the stay and the
+ * figures are invented, and they are chosen to exercise every part of the
+ * layout: a multi-night stay, an extra charge, a discount, tax, and a part
+ * payment leaving a balance.
+ */
+export function sampleReceipt(store, opts) {
+  const o = opts || {};
+  const s = Object.assign({}, printerSettings(store), {
+    template: o.template || printerSettings(store).template
+  });
+  const compact = (o.mode || s.mode) === 'compact';
+  const property = store.property;
+  const currency = property.currency || 'Rs';
+  const money = v => formatMoney(v, currency);
+  const word = typeof store.unitWord === 'function' ? store.unitWord() : 'Room';
+  const b = [];
+
+  b.push(head(property, s, compact, 'Guest Bill'));
+
+  b.push(kv('Invoice', 'INV-0247'));
+  b.push(kv('Date', formatDateTime(nowIso())));
+  b.push('<div class="rule--sub"></div>');
+  b.push(kv('Guest', 'Zahid Ullah'));
+  b.push(kv('CNIC', maskCnic('15202-1234567-1')));
+  b.push(kv(word, '204  ·  Deluxe Double'));
+  b.push(kv('Nights', '3'));
+
+  if (!compact) b.push('<div class="gap"></div>');
+  b.push(`<table class="items"><thead><tr>
+      <th class="desc">Description</th><th class="n">Amount</th>
+    </tr></thead><tbody>
+      <tr><td class="desc">${escapeHtml(word)} charge — 3 night(s)</td><td class="n num">25,500</td></tr>
+      ${compact ? '' : '<tr class="sub"><td class="desc" colspan="2">@ Rs 8,500 per night</td></tr>'}
+      <tr><td class="desc">Extra bed</td><td class="n num">1,500</td></tr>
+      <tr><td class="desc">Restaurant — table 4</td><td class="n num">2,150</td></tr>
+    </tbody></table>`);
+  b.push('<div class="rule"></div>');
+
+  b.push(kv('Subtotal', money(29150)));
+  b.push(kv('Discount', '− ' + money(1000)));
+  b.push(kv('Tax 5%', money(1408)));
+  b.push('<div class="rule"></div>');
+  b.push(`<div class="kv total"><span>TOTAL</span><span class="num">${escapeHtml(money(29558))}</span></div>`);
+  b.push(kv('Paid — Cash', money(20000)));
+  b.push('<div class="rule"></div>');
+  b.push(`<div class="kv balance"><span>BALANCE DUE</span><span class="num">${escapeHtml(money(9558))}</span></div>`);
+  if (!compact) {
+    b.push(`<div class="words">Nine thousand five hundred fifty-eight rupees only</div>`);
+  }
+
+  b.push(foot(property, s, compact, 'Served by Reception'));
+  return wrap(receiptCss(s, compact), b.join(''));
+}

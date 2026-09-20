@@ -201,6 +201,87 @@ ok('registration card shows the Pakistan register fields', card.indexOf('Coming 
 const dayDoc = a4.dayCloseDocument(store, { figures, expenses: [] });
 ok('day close A4 shows collection by method', dayDoc.indexOf('Collection by method') > -1);
 
+suite('Receipt designs');
+
+const designs = r80.templateList();
+ok('four designs are offered', designs.length === 4, String(designs.length));
+ok('every design has a name and an explanation',
+  designs.every(d => d.key && d.label && d.note));
+ok('classic is the default', r80.DEFAULT_TEMPLATE === 'classic');
+
+// A logo and an address, so the parts that differ between designs are present.
+const LOGO = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+await store.updateProperty({ logo: LOGO });
+
+const designDocs = {};
+for (const d of designs) {
+  await store.updateSetting('printer', Object.assign({}, store.setting('printer'), { template: d.key }));
+  designDocs[d.key] = r80.guestBill(store, { reservation: closed.reservation, guest, unit, bill: frozen, invoiceNo: 'INV-1' });
+}
+
+for (const d of designs) {
+  const doc = designDocs[d.key];
+  ok(`${d.label} prints the property name`, doc.indexOf('Kalam Continental') > -1);
+  ok(`${d.label} prints the address`, doc.indexOf('Main Bazaar Road') > -1);
+  ok(`${d.label} prints the phone number`, doc.indexOf('0300-1234567') > -1);
+  ok(`${d.label} prints the logo`, doc.indexOf(LOGO) > -1);
+  ok(`${d.label} names the document`, doc.toUpperCase().indexOf('GUEST BILL') > -1);
+  ok(`${d.label} still shows the total`, doc.indexOf('TOTAL') > -1);
+  ok(`${d.label} still shows the invoice number`, doc.indexOf('INV-1') > -1);
+}
+
+// The whole point: the figures must not move when the letterhead changes.
+const figuresOf = doc => (doc.match(/<span class="num">[^<]*<\/span>/g) || []).join('|');
+const classicFigures = figuresOf(designDocs.classic);
+for (const d of designs.filter(x => x.key !== 'classic')) {
+  ok(`${d.label} leaves every figure exactly as classic prints it`,
+    figuresOf(designDocs[d.key]) === classicFigures);
+}
+
+ok('banded reverses the name out of a solid band', designDocs.banded.indexOf('class="band"') > -1);
+ok('letterhead sets the logo beside the address', designDocs.letterhead.indexOf('class="lh"') > -1);
+ok('minimal is the shortest header of the four',
+  designs.filter(d => d.key !== 'minimal').every(d => headLength(designDocs.minimal) < headLength(designDocs[d.key])),
+  designs.map(d => d.key + ':' + headLength(designDocs[d.key])).join(' '));
+
+/** Everything printed before the first figure — i.e. the letterhead. */
+function headLength(doc) {
+  const body = doc.slice(doc.indexOf('<body>'));
+  const at = body.indexOf('Invoice');
+  return at > -1 ? at : body.length;
+}
+
+// A property with no logo must not leave a hole where one would have been.
+await store.updateProperty({ logo: '' });
+await store.updateSetting('printer', Object.assign({}, store.setting('printer'), { template: 'letterhead' }));
+const noLogo = r80.guestBill(store, { reservation: closed.reservation, guest, unit, bill: frozen, invoiceNo: 'INV-1' });
+ok('letterhead without a logo falls back to a centred head', noLogo.indexOf('class="lh"') === -1);
+ok('...and still prints the name and address',
+  noLogo.indexOf('Kalam Continental') > -1 && noLogo.indexOf('Main Bazaar Road') > -1);
+await store.updateProperty({ logo: LOGO });
+
+// An unknown design must never produce a receipt with no letterhead at all.
+await store.updateSetting('printer', Object.assign({}, store.setting('printer'), { template: 'nonsense-design' }));
+const fallback = r80.guestBill(store, { reservation: closed.reservation, guest, unit, bill: frozen, invoiceNo: 'INV-1' });
+ok('an unknown design falls back to classic rather than printing nothing',
+  fallback.indexOf('Kalam Continental') > -1 && fallback.indexOf('class="band"') === -1);
+
+suite('The design sample');
+
+await store.updateSetting('printer', Object.assign({}, store.setting('printer'), { template: 'classic' }));
+const sample = r80.sampleReceipt(store);
+ok('the sample uses the real property name', sample.indexOf('Kalam Continental') > -1);
+ok('the sample uses the real address', sample.indexOf('Main Bazaar Road') > -1);
+ok('the sample uses the real logo', sample.indexOf(LOGO) > -1);
+ok('the sample shows a balance, so that row can be judged', sample.indexOf('BALANCE DUE') > -1);
+ok('the sample masks the CNIC the way a real receipt does', sample.indexOf('15202-1234567-1') === -1);
+ok('the sample can be asked for a design it is not saved with',
+  r80.sampleReceipt(store, { template: 'banded' }).indexOf('class="band"') > -1);
+ok('asking for a design does not change the saved one',
+  store.setting('printer').template === 'classic');
+ok('the compact sample is shorter than the normal one',
+  r80.sampleReceipt(store, { mode: 'compact' }).length < r80.sampleReceipt(store, { mode: 'normal' }).length);
+
 suite('Escaping');
 const evil = await guests.saveGuest(store, { fullName: '<script>alert(1)</script> & "Co"', cnic: '11111-2222222-3', phone: '0300-9999999' });
 const evilDoc = a4.invoiceDocument(store, { reservation: closed.reservation, guest: evil, unit, bill: frozen, invoiceNo: 'X' });

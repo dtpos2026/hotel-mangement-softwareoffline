@@ -119,6 +119,7 @@ export function printerSettings(store) {
     compactFontSizePt: clamp(s.compactFontSizePt, 6, 14, 10),
     logoSizePx:     clamp(s.logoSizePx, 32, 240, 96),
     showLogo:       s.showLogo !== false,
+    template:       String(s.template || 'classic'),
     mode:           s.mode === 'compact' ? 'compact' : 'normal',
     copies:         clamp(s.copies, 1, 5, 1),
     printerName:    String(s.printerName || ''),

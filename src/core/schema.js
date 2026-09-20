@@ -185,6 +185,7 @@ export function defaultSettings() {
       compactFontSizePt: 10,
       logoSizePx: 96,
       showLogo: true,
+      template: 'classic',     // the 80mm letterhead design; see src/print/receipt80.js
       mode: 'normal',          // 'normal' | 'compact'
       copies: 1,
       printerName: '',         // chosen from the real printer list in the desktop build

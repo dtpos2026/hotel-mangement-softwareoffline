@@ -234,6 +234,21 @@ export function printTestPage(store) {
   });
 }
 
+/**
+ * The sample bill from the design picker, on real paper.
+ *
+ * It takes the design being previewed rather than the saved one, so a design
+ * can be tried on the actual printer before it is committed to.
+ */
+export function printSample(store, opts) {
+  const o = opts || {};
+  return preview(store, {
+    title: 'Receipt design sample',
+    subtitle: 'Sample figures — nothing is recorded.',
+    build: mode => r80.sampleReceipt(store, { template: o.template, mode })
+  });
+}
+
 /* ------------------------------------------------------------- A4 actions */
 
 export function printInvoice(store, reservation) {

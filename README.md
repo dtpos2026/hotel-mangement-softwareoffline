@@ -52,6 +52,13 @@ print area — the width an 80mm head actually images, centred on the roll.
 *Compact mode* prints the same content about 35% shorter for properties that
 want to save paper. It stays at 10pt and uses no dotted or hairline text.
 
+**Four receipt designs** — Classic, Banded, Letterhead and Minimal — change the
+letterhead only: the logo, the property name and the address, set in Settings ›
+Property. Every figure, column and total is identical in all four, so changing
+the look cannot change what a receipt says. Pick one in Settings › Receipt &
+printer, where a real 80mm receipt is previewed beside the choices and can be
+printed on the actual printer before it is saved.
+
 Use **Test print** after any change: it prints a ruler with edge arrows, so
 clipping is obvious at a glance.
 
@@ -132,9 +139,9 @@ is not a secret.
 ## Tests
 
 ```bash
-npm test                                  # 534 checks, no browser needed
+npm test                                  # 582 checks, no browser needed
 npx http-server -p 8765 -s . &            # then, for the browser suites:
-node tests/browser.test.mjs               # 76 checks in real Chromium
+node tests/browser.test.mjs               # 91 checks in real Chromium
 npm run test:panel                        # 65 checks, serves itself
 ```
 
