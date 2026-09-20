@@ -2,3 +2,11 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+vendor/
+
+# Electron build output
+release/
+node_modules/
+
+# Vendor signing key — never commit
+vendor/

@@ -4,6 +4,8 @@
 
 import { AppStore } from './core/store.js';
 import { App } from './ui/app.js';
+import * as host from './core/host.js';
+import { activationGate } from './ui/screens/activation.js';
 import { h, mount, qs } from './ui/dom.js';
 import { toast, modal, ok as toastOk, fail } from './ui/feedback.js';
 import { field, alert } from './ui/components.js';
@@ -25,10 +27,12 @@ import * as expenses from './ui/screens/expenses.js';
 import * as reports from './ui/screens/reports.js';
 import * as closing from './ui/screens/closing.js';
 import * as settings from './ui/screens/settings.js';
+import * as activation from './ui/screens/activation.js';
 
 const SCREEN_MODULES = {
   dashboard, units, calendar, reservations, checkin, inhouse, checkout,
-  guests, register, payments, housekeeping, expenses, reports, closing, settings
+  guests, register, payments, housekeeping, expenses, reports, closing, settings,
+  activation
 };
 
 function splash(message, detail) {
@@ -54,6 +58,16 @@ async function boot() {
   const root = qs('#root');
   mount(root, splash('Opening your data…'));
 
+  // The licence decides whether the app opens at all, so it is checked before
+  // the database so an expired copy never even touches the data.
+  const licence = await host.licenceStatus();
+  host.setLicence(licence);
+
+  if (!licence.ok) {
+    activationGate(root, licence, () => window.location.reload());
+    return;
+  }
+
   let store;
   try {
     store = await AppStore.boot();
@@ -74,10 +88,50 @@ async function boot() {
   for (const id of Object.keys(SCREEN_MODULES)) screens[id] = SCREEN_MODULES[id].render;
 
   const app = new App(store, root, screens);
-  window.__hms = { store, app };   // a hook for support, not used by the app
+  window.__hms = { store, app, licence };   // a hook for support, not used by the app
   app.start();
 
+  wireNativeMenu(app);
+  await nightlyDiskBackup(store);
+
+  // A licence inside its last fortnight is worth mentioning once at startup,
+  // long before it becomes an emergency at the front desk.
+  if (licence.expiringSoon) {
+    toast('warn', 'Licence expiring soon', licence.message, 12000);
+  }
+
   if (store.db.all('units').length === 0) firstRun(store, app);
+}
+
+/** Native menu items map onto the same navigation the sidebar uses. */
+function wireNativeMenu(app) {
+  host.onMenu(action => {
+    switch (action) {
+      case 'search':    app.focusSearch(); break;
+      case 'backup':    app.go('settings', { tab: 'backup' }); break;
+      case 'restore':   app.go('settings', { tab: 'backup' }); break;
+      case 'licence':   app.go('settings', { tab: 'licence' }); break;
+      case 'testprint': app.go('settings', { tab: 'printing' }); break;
+      default:          app.go(action); break;
+    }
+  });
+}
+
+/**
+ * On the desktop, write one backup a day into Documents. The in-browser copy
+ * is convenient; this is the one that survives a reinstall or a new computer.
+ */
+async function nightlyDiskBackup(store) {
+  if (!host.isDesktop) return;
+  try {
+    const { shouldAutoBackup, buildBackup, backupFilename } = await import('./core/backup.js');
+    if (!shouldAutoBackup(store)) return;
+    const backup = buildBackup(store);
+    const result = await host.autoBackupToDisk(backupFilename(store, 'auto'), JSON.stringify(backup));
+    if (result.ok) await store.updateSetting('app', { lastAutoBackupAt: new Date().toISOString() });
+  } catch (err) {
+    console.warn('[hms] disk backup skipped:', err);
+  }
 }
 
 /* ------------------------------------------------------------- first run */

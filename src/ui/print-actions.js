@@ -10,7 +10,8 @@
 import { h, mount } from './dom.js';
 import { modal, fail } from './feedback.js';
 import { segmented } from './components.js';
-import { printDocument, openDocument, printerSettings } from '../print/printer.js';
+import { openDocument, printerSettings } from '../print/printer.js';
+import * as host from '../core/host.js';
 import * as r80 from '../print/receipt80.js';
 import * as a4 from '../print/a4.js';
 import { billFor } from '../domain/folio.js';
@@ -71,9 +72,16 @@ export function preview(store, opts) {
         onclick: () => { try { openDocument(o.build(mode)); } catch (err) { fail(err); } } }),
       h('button.btn', { type: 'button', text: 'Close', onclick: () => dialog.close() }),
       h('button.btn.btn--primary', { type: 'button', text: 'Print',
-        onclick: async () => {
-          try { await printDocument(o.build(mode), { copies: printerSettings(store).copies }); dialog.close(); }
-          catch (err) { fail(err, 'Could not print'); }
+        onclick: async (e) => {
+          const btn = e.currentTarget;
+          btn.classList.add('is-busy'); btn.disabled = true;
+          try {
+            await printNow(store, o.build(mode), { wide: o.wide });
+            dialog.close();
+          } catch (err) {
+            fail(err, 'Could not print');
+            btn.classList.remove('is-busy'); btn.disabled = false;
+          }
         } })
     ]
   });
@@ -87,13 +95,32 @@ function geometryNote(store) {
   return `${s.widthMm}mm paper · ${area}mm print area`;
 }
 
-/** Prints straight away, with the settings' mode and copy count. */
-export async function printNow(store, html) {
-  try {
-    await printDocument(html, { copies: printerSettings(store).copies });
-  } catch (err) {
-    fail(err, 'Could not print');
+/**
+ * Prints with the saved geometry.
+ *
+ * On the desktop the page is set to a continuous roll of the configured width,
+ * so a thermal driver does not pad an 80mm receipt out to A4, and the job can
+ * go straight to the chosen printer with no dialog. In a browser neither is
+ * possible, so it falls back to the hidden-iframe print path.
+ */
+export async function printNow(store, html, opts) {
+  const o = opts || {};
+  const s = printerSettings(store);
+  const job = { copies: s.copies };
+
+  if (host.isDesktop) {
+    job.printerName = s.printerName || '';
+    job.silent = !!s.silentPrint && !!job.printerName;
+    if (o.wide) {
+      job.pageSize = 'A4';
+      job.landscape = !!o.landscape;
+    } else {
+      job.widthMm = s.widthMm;
+      job.heightMm = 2000;      // a long roll; the driver cuts at the content
+    }
   }
+
+  await host.printDocument(html, job);
 }
 
 function ctxFor(store, reservation, opts) {

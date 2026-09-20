@@ -13,6 +13,8 @@ import { formatDateTime, nowIso } from '../../core/dates.js';
 import { newId } from '../../core/ids.js';
 import { printTestPage } from '../print-actions.js';
 import { printerSettings, contentWidthMm } from '../../print/printer.js';
+import * as host from '../../core/host.js';
+import { activationCard } from './activation.js';
 
 const TABS = [
   { id: 'property', label: 'Property' },
@@ -20,6 +22,7 @@ const TABS = [
   { id: 'booking', label: 'Booking rules' },
   { id: 'users', label: 'Users & roles' },
   { id: 'backup', label: 'Backup & restore' },
+  { id: 'licence', label: 'Licence' },
   { id: 'about', label: 'About & data' }
 ];
 
@@ -31,7 +34,7 @@ export function render(ctx) {
 
   const body = {
     property: propertyTab, printing: printingTab, booking: bookingTab,
-    users: usersTab, backup: backupTab, about: aboutTab
+    users: usersTab, backup: backupTab, licence: licenceTab, about: aboutTab
   }[state.tab] || propertyTab;
 
   return [
@@ -207,9 +210,13 @@ function printingTab(ctx) {
         h('div.field', { style: { justifyContent: 'center' } },
           checkbox({ label: 'Print the logo on receipts', name: 'showLogo', value: s.showLogo, disabled: !canEdit }))
       ]),
-      field({ label: 'Printer name (for staff reference)', name: 'printerName', value: s.printerName,
-        placeholder: 'XPrinter XP-80C at reception', disabled: !canEdit,
-        hint: 'Browsers cannot pick a printer for you — this is a note, and the printer itself is chosen in the system print dialog. Set it as the default printer in Windows for one-click printing.' })
+      h('div.field', [
+        h('label.field__label', { text: 'Receipt printer' }),
+        h('div', { id: 'printerBox' }),
+        h('div.field__hint', { id: 'printerHint' })
+      ]),
+      host.isDesktop ? checkbox({ label: 'Print receipts without showing the print dialog', name: 'silentPrint',
+        value: s.silentPrint, disabled: !canEdit }) : null
     ])),
 
     card({ title: 'Test and preview' }, h('div.stack', [
@@ -229,6 +236,44 @@ function printingTab(ctx) {
   function onChange() {
     drawGeometry(formValues(form));
   }
+
+  // The desktop build can enumerate real printers; the browser cannot, so it
+  // falls back to a note for staff and the system print dialog.
+  let printerName = s.printerName;
+  setTimeout(async () => {
+    const box = qs('#printerBox', form);
+    const hint = qs('#printerHint', form);
+    if (!box) return;
+    if (!host.isDesktop) {
+      mount(box, h('input.input', {
+        name: 'printerName', value: printerName, disabled: !canEdit,
+        placeholder: 'XPrinter XP-80C at reception',
+        oninput: e => { printerName = e.target.value; }
+      }));
+      hint.textContent = 'A browser cannot choose a printer for you, so this is only a note for staff — the printer is picked in the system print dialog. The installed desktop version prints straight to the printer you choose here.';
+      return;
+    }
+    mount(box, h('div.text-sm.text-muted', { text: 'Looking for printers\u2026' }));
+    const printers = await host.listPrinters();
+    if (!printers.length) {
+      mount(box, h('div.text-sm', { text: 'No printers found on this computer.' }));
+      hint.textContent = 'Install the printer in Windows first, then reopen this screen.';
+      return;
+    }
+    if (!printerName || !printers.some(p => p.name === printerName)) {
+      const fallback = printers.find(p => p.isDefault) || printers[0];
+      printerName = fallback.name;
+    }
+    mount(box, h('select.select', {
+      name: 'printerName', disabled: !canEdit,
+      onchange: e => { printerName = e.target.value; }
+    }, printers.map(p => h('option', {
+      value: p.name,
+      selected: p.name === printerName,
+      text: p.displayName + (p.isDefault ? '  (Windows default)' : '')
+    }))));
+    hint.textContent = `${printers.length} printer(s) found. Receipts print straight to this one.`;
+  }, 0);
 
   let mode = s.mode;
   setTimeout(() => {
@@ -250,7 +295,7 @@ function printingTab(ctx) {
         onclick: e => busy(e.currentTarget, async () => {
           const v = formValues(form);
           try {
-            await store.updateSetting('printer', Object.assign({}, v, { mode }));
+            await store.updateSetting('printer', Object.assign({}, v, { mode, printerName }));
             toastOk('Printer settings saved', `${v.widthMm}mm · ${contentWidthMm(printerSettings(store))}mm print area`);
             app.refresh();
           } catch (err) { fail(err); }
@@ -661,6 +706,24 @@ function startRestoreFromText(ctx, text, filename) {
     ]
   });
   return dialog;
+}
+
+/* ---------------------------------------------------------------- licence */
+
+function licenceTab(ctx) {
+  const { app } = ctx;
+  const holder = h('div.stack', h('div.text-sm.text-muted', { text: 'Checking licence\u2026' }));
+  host.licenceStatus().then(status => {
+    host.setLicence(status);
+    mount(holder, [
+      activationCard(status, () => app.refresh(), { inline: true }),
+      !host.isDesktop ? alert('info', 'Browser preview',
+        'Licensing applies to the installed desktop application. Run the installer to activate a licence.') : null
+    ]);
+  }).catch(err => {
+    mount(holder, alert('due', 'Could not read the licence', String(err && err.message || err)));
+  });
+  return holder;
 }
 
 /* ------------------------------------------------------------------ about */

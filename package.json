@@ -1,12 +1,103 @@
 {
-  "name": "hotel-management-offline",
+  "name": "hotel-register",
   "version": "1.0.0",
-  "description": "Offline hotel / guest house / resort management system. No dependencies, no build step - index.html runs the app directly.",
+  "description": "Offline hotel, guest house, resort and apartment management. All data stays on this computer.",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/run.js && node tests/print.test.js && node tests/integration.test.js",
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "node tools/build.mjs",
+    "dist": "npm run build && electron-builder --win --x64",
+    "dist:portable": "npm run build && electron-builder --win portable --x64",
+    "dist:all": "npm run build && electron-builder --win --x64 --ia32",
+    "pack": "npm run build && electron-builder --dir",
+    "licence": "node tools/license-manager/server.mjs",
+    "licence:keygen": "node tools/licence-cli.mjs keygen",
+    "licence:issue": "node tools/licence-cli.mjs issue",
+    "licence:list": "node tools/licence-cli.mjs list",
+    "test": "node tests/run.js && node tests/print.test.js && node tests/licence.test.js && node tests/integration.test.js",
     "test:browser": "node tests/browser.test.mjs",
     "serve": "npx http-server -p 8080 -c-1 ."
+  },
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  },
+  "productName": "Hotel Register",
+  "author": {
+    "name": "Digital Target",
+    "email": "support@digitaltarget.pk"
+  },
+  "homepage": "https://digitaltarget.pk",
+  "license": "UNLICENSED",
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "pk.digitaltarget.hotelregister",
+    "productName": "Hotel Register",
+    "copyright": "Copyright © 2026 Digital Target",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "index.html",
+      "electron/**/*",
+      "src/**/*",
+      "styles/**/*",
+      "assets/**/*",
+      "package.json",
+      "!**/*.map",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}/**",
+      "!**/node_modules/**/*.md"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "${productName} Setup ${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Hotel Register",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "installerLanguages": [
+        "en_US"
+      ],
+      "language": "1033"
+    },
+    "portable": {
+      "artifactName": "${productName} Portable ${version}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png",
+      "category": "Office"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.business"
+    }
   }
 }

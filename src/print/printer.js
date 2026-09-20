@@ -122,6 +122,7 @@ export function printerSettings(store) {
     mode:           s.mode === 'compact' ? 'compact' : 'normal',
     copies:         clamp(s.copies, 1, 5, 1),
     printerName:    String(s.printerName || ''),
+    silentPrint:    !!s.silentPrint,
     a4MarginMm:     clamp(s.a4MarginMm, 5, 30, 12)
   };
 }

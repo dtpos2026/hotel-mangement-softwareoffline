@@ -152,7 +152,8 @@ export function defaultSettings() {
       showLogo: true,
       mode: 'normal',          // 'normal' | 'compact'
       copies: 1,
-      printerName: '',         // browsers cannot enumerate printers; this is a note for staff
+      printerName: '',         // chosen from the real printer list in the desktop build
+      silentPrint: false,      // desktop only: skip the print dialog entirely
       a4MarginMm: 12,
       openDialog: true
     },
