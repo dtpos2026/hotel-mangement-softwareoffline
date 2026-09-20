@@ -16,6 +16,7 @@ import { arrivalsOn, departuresOn, inHouse } from '../domain/reservations.js';
 import { countByStatus } from '../domain/units.js';
 import { hasFeature } from '../core/host.js';
 import { outstanding } from '../domain/payments.js';
+import { summary as stockSummary } from '../domain/inventory.js';
 
 export const SCREENS = [
   { id: 'dashboard',    label: 'Dashboard',    ur: 'ڈیش بورڈ',      perm: 'view.dashboard' },
@@ -29,6 +30,7 @@ export const SCREENS = [
   { id: 'register',     label: 'Register',     ur: 'روزنامچہ',      perm: 'view.register' },
   { id: 'payments',     label: 'Payments',     ur: 'وصولیاں',       perm: null },
   { id: 'restaurant',   label: 'Restaurant',   ur: 'ریسٹورنٹ',      perm: null, module: 'restaurant' },
+  { id: 'inventory',    label: 'Stock',        ur: 'اسٹاک',         perm: null, module: 'inventory' },
   { id: 'housekeeping', label: 'Housekeeping', ur: 'صفائی',         perm: 'housekeeping.update' },
   { id: 'expenses',     label: 'Expenses',     ur: 'اخراجات',       perm: 'expense.create' },
   { id: 'reports',      label: 'Reports',      ur: 'رپورٹس',        perm: 'view.reports' },
@@ -84,6 +86,10 @@ export class App {
         if (!this.store.setting('restaurant').enabled) return false;
         if (!hasFeature('restaurant') && !hasFeature('reports')) return false;
       }
+      if (s.module === 'inventory') {
+        if (!this.store.setting('inventory').enabled) return false;
+        if (!hasFeature('inventory') && !hasFeature('expenses')) return false;
+      }
       return true;
     });
   }
@@ -102,7 +108,10 @@ export class App {
       payments: outstanding(store).length,
       restaurant: store.setting('restaurant').enabled
         ? store.db.all('orders').filter(o => ['open', 'served', 'billed'].indexOf(o.status) > -1).length
-        : 0
+        : 0,
+      // The stock badge is what needs ordering — the only thing on that screen
+      // that is urgent enough to interrupt someone.
+      inventory: store.setting('inventory').enabled ? stockSummary(store).lowCount : 0
     };
   }
 

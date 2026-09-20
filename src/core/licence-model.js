@@ -34,13 +34,16 @@ export const FEATURES = [
   { key: 'userManagement',  label: 'Multiple users and roles' },
   { key: 'backupRestore',   label: 'Backup and restore' },
   { key: 'advancedReports', label: 'Unit performance and guest history' },
+  { key: 'restaurant',      label: 'Restaurant point of sale' },
+  { key: 'inventory',       label: 'Stock, purchasing and suppliers' },
   { key: 'multiProperty',   label: 'Multiple properties' }
 ];
 
 export const PLAN_FEATURES = {
   trial:        ['reports', 'expenses', 'housekeeping', 'dayClose', 'backupRestore'],
   standard:     ['reports', 'expenses', 'housekeeping', 'dayClose', 'backupRestore', 'userManagement'],
-  professional: ['reports', 'expenses', 'housekeeping', 'dayClose', 'backupRestore', 'userManagement', 'advancedReports'],
+  professional: ['reports', 'expenses', 'housekeeping', 'dayClose', 'backupRestore', 'userManagement',
+                 'advancedReports', 'restaurant', 'inventory'],
   enterprise:   FEATURES.map(f => f.key),
   lifetime:     FEATURES.map(f => f.key)
 };

@@ -26,6 +26,7 @@ export const PERMISSIONS = [
   'payment.create', 'payment.void', 'payment.refund',
   'housekeeping.update', 'maintenance.manage',
   'expense.create', 'expense.void',
+  'stock.manage', 'stock.move', 'purchase.create', 'purchase.cancel',
   'day.close', 'day.reopen',
   'settings.manage', 'user.manage', 'backup.manage', 'data.reset'
 ];
@@ -46,12 +47,13 @@ const ROLE_PERMISSIONS = {
     'housekeeping.update'
   ],
 
-  housekeeping: ['housekeeping.update', 'maintenance.manage'],
+  housekeeping: ['housekeeping.update', 'maintenance.manage', 'stock.move'],
 
   accountant: [
     'view.dashboard', 'view.reports', 'view.register',
     'payment.create', 'payment.void', 'payment.refund',
-    'expense.create', 'expense.void', 'day.close', 'folio.add', 'folio.void'
+    'expense.create', 'expense.void', 'day.close', 'folio.add', 'folio.void',
+    'stock.manage', 'stock.move', 'purchase.create', 'purchase.cancel'
   ]
 };
 

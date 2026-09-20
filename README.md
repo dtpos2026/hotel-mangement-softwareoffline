@@ -67,6 +67,24 @@ off**, **Scale: 100%**. Set the thermal printer as the system default for
 one-click printing — browsers cannot choose a printer for you, which is why
 the printer name field here is only a note for staff.
 
+## Stock and purchasing
+
+Switched on in Settings › Stock, like the restaurant module. It adds a **Stock**
+entry to the sidebar with three tabs: what is on the shelves, what was bought,
+and what each supplier is owed.
+
+Stock on hand is never stored as a number — it is the sum of the movements, so
+a balance cannot drift away from the history that produced it. A stock take
+writes a correcting movement rather than overwriting a figure. Every movement
+freezes its own cost, so what a bag of rice cost in March stays what March's
+consumption was worth. Recording a delivery writes the bill, its lines and one
+stock movement per line in a single transaction: a purchase can never exist
+without the stock it brought in.
+
+Cancelling a purchase puts its stock back, and is refused when any of that
+stock has already been used — reversing it would make the history describe
+something that never happened.
+
 **A4.** Invoices, registration cards, day-close reports and all thirteen
 reports. Reports are paginated in code, so "Page 2 of 5", the column header and
 the property masthead repeat properly on every sheet.
@@ -139,9 +157,9 @@ is not a secret.
 ## Tests
 
 ```bash
-npm test                                  # 582 checks, no browser needed
+npm test                                  # 672 checks, no browser needed
 npx http-server -p 8765 -s . &            # then, for the browser suites:
-node tests/browser.test.mjs               # 91 checks in real Chromium
+node tests/browser.test.mjs               # 115 checks in real Chromium
 npm run test:panel                        # 65 checks, serves itself
 ```
 
@@ -153,6 +171,10 @@ npm run test:panel                        # 65 checks, serves itself
 - `tests/browser.test.mjs` — real Chromium: IndexedDB, the booking form
   refusing a clash, a walk-in, the print pipeline, check-out with a balance,
   the Urdu switch, backup/restore, role permissions.
+- `tests/inventory.test.js` — stock and purchasing: that a balance always
+  equals the movements that produced it, that consumption keeps the cost it
+  was made at, and that a purchase whose stock has been used cannot be
+  reversed.
 - `tests/panel.test.mjs` — the licence panel in Chromium with every Firebase
   call intercepted and answered in Firestore's own wire format, so issuing,
   renewing, revoking and releasing a licence are all covered without touching

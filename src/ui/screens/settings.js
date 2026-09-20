@@ -10,6 +10,7 @@ import { PROPERTY_TYPES } from '../../core/schema.js';
 import { ROLES, roleLabel, hashPassword, newSalt, permissionsFor, PERMISSIONS, checkPassword } from '../../core/auth.js';
 import { buildBackup, backupFilename, validateBackup, restoreBackup, readAutoBackups, saveAutoBackup, downloadFile, readFileAsText } from '../../core/backup.js';
 import { formatDateTime, nowIso } from '../../core/dates.js';
+import { formatMoney } from '../../core/money.js';
 import { newId } from '../../core/ids.js';
 import { printTestPage, printSample } from '../print-actions.js';
 import { printerSettings, contentWidthMm } from '../../print/printer.js';
@@ -18,6 +19,7 @@ import * as host from '../../core/host.js';
 import { activationCard } from './activation.js';
 import { whatsappPanel } from '../whatsapp.js';
 import * as rest from '../../domain/restaurant.js';
+import * as invApi from '../../domain/inventory.js';
 import { CATEGORY_COLOURS } from '../../core/schema.js';
 
 const TABS = [
@@ -27,6 +29,7 @@ const TABS = [
   { id: 'users', label: 'Users & roles' },
   { id: 'backup', label: 'Backup & restore' },
   { id: 'restaurant', label: 'Restaurant' },
+  { id: 'inventory', label: 'Stock' },
   { id: 'whatsapp', label: 'WhatsApp' },
   { id: 'licence', label: 'Licence' },
   { id: 'about', label: 'About & data' }
@@ -40,7 +43,8 @@ export function render(ctx) {
 
   const body = {
     property: propertyTab, printing: printingTab, booking: bookingTab,
-    users: usersTab, backup: backupTab, restaurant: restaurantTab, whatsapp: whatsappTab,
+    users: usersTab, backup: backupTab, restaurant: restaurantTab, inventory: inventoryTab,
+    whatsapp: whatsappTab,
     licence: licenceTab, about: aboutTab
   }[state.tab] || propertyTab;
 
@@ -857,6 +861,58 @@ function startRestoreFromText(ctx, text, filename) {
 }
 
 /* ------------------------------------------------------------- restaurant */
+
+function inventoryTab(ctx) {
+  const { store, app } = ctx;
+  const canEdit = store.session.can('settings.manage');
+  const cfg = invApi.settings(store);
+  const sum = invApi.summary(store);
+  const currency = store.currency();
+
+  const form = h('div.stack', [
+    card({ title: 'Stock and purchasing' }, h('div.stack', [
+      checkbox({ label: 'Enable stock and purchasing', name: 'enabled', value: cfg.enabled, disabled: !canEdit }),
+      h('div.field__hint', { text: 'When on, a Stock entry appears in the sidebar for what is on the shelves, what was bought, and what each supplier is owed.' }),
+      h('div.form-grid.form-grid--2', [
+        field({ label: 'Default department', name: 'defaultDepartment', value: cfg.defaultDepartment,
+          disabled: !canEdit, placeholder: 'Kitchen',
+          hint: 'Filled in first when someone issues stock.' }),
+        h('div.field', { style: { justifyContent: 'flex-end' } },
+          checkbox({ label: 'Warn when an item falls to its reorder level', name: 'warnOnLowStock',
+            value: cfg.warnOnLowStock, disabled: !canEdit }))
+      ])
+    ])),
+    cfg.enabled
+      ? card({ title: 'What is tracked now' }, h('div.kpi-row', [
+          kpi({ label: 'Items', value: String(sum.items) }),
+          kpi({ label: 'Stock value', value: formatMoney(sum.stockValue, currency) }),
+          kpi({ label: 'Need ordering', value: String(sum.lowCount), tone: sum.lowCount ? 'warn' : null }),
+          kpi({ label: 'Owed to suppliers', value: formatMoney(sum.suppliersOwed, currency) })
+        ]))
+      : null
+  ]);
+
+  return h('div.stack', [
+    !canEdit ? alert('info', 'Read-only', 'Only a manager or admin can change these.') : null,
+    form,
+    canEdit ? h('div.row', [
+      h('button.btn.btn--primary', { type: 'button', text: 'Save stock settings',
+        onclick: e => busy(e.currentTarget, async () => {
+          const v = formValues(form);
+          try {
+            await store.updateSetting('inventory', {
+              enabled: !!v.enabled,
+              trackKitchenStock: true,
+              warnOnLowStock: !!v.warnOnLowStock,
+              defaultDepartment: String(v.defaultDepartment || 'Kitchen').trim()
+            });
+            toastOk('Stock settings saved');
+            app.render();
+          } catch (err) { fail(err); }
+        }) })
+    ]) : null
+  ]);
+}
 
 function restaurantTab(ctx) {
   const { store, app } = ctx;

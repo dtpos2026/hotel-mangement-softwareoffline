@@ -31,7 +31,13 @@ export const COLLECTIONS = [
   'menuItems',
   'tables',
   'orders',
-  'orderLines'
+  'orderLines',
+  // Stock and purchasing. Same story: present always, empty until switched on.
+  'suppliers',
+  'stockItems',
+  'stockMoves',     // every increase and decrease, append-only
+  'purchases',
+  'purchaseLines'
 ];
 
 /* ---------------------------------------------------------------- vocabulary */
@@ -204,6 +210,13 @@ export function defaultSettings() {
       allowOverbook: false     // never enabled by the UI; present so the rule is explicit
     },
     {
+      id: 'inventory',
+      enabled: false,
+      trackKitchenStock: true,
+      warnOnLowStock: true,
+      defaultDepartment: 'Kitchen'
+    },
+    {
       id: 'restaurant',
       enabled: false,
       serviceChargePercent: 0,
@@ -370,6 +383,92 @@ export function makeOrderLine(patch) {
     sentAt: null, addedBy: '',
     createdAt: new Date().toISOString(),
     voided: false, voidReason: ''
+  }, patch || {});
+}
+
+/* -------------------------------------------------------- stock & purchasing */
+
+export const STOCK_UNITS = [
+  { id: 'kg',    label: 'Kilogram', short: 'kg' },
+  { id: 'g',     label: 'Gram',     short: 'g' },
+  { id: 'litre', label: 'Litre',    short: 'L' },
+  { id: 'ml',    label: 'Millilitre', short: 'ml' },
+  { id: 'piece', label: 'Piece',    short: 'pc' },
+  { id: 'dozen', label: 'Dozen',    short: 'dz' },
+  { id: 'packet', label: 'Packet',  short: 'pkt' },
+  { id: 'bottle', label: 'Bottle',  short: 'btl' },
+  { id: 'bag',   label: 'Bag',      short: 'bag' }
+];
+
+export const STOCK_CATEGORIES = [
+  'Kitchen', 'Housekeeping', 'Maintenance', 'Stationery', 'Laundry', 'Other'
+];
+
+/** Why stock moved. Purchases and returns go up; the rest go down. */
+export const STOCK_REASONS = [
+  { id: 'purchase', label: 'Purchase',      direction: 1 },
+  { id: 'opening',  label: 'Opening stock', direction: 1 },
+  { id: 'return',   label: 'Return to stock', direction: 1 },
+  { id: 'issue',    label: 'Issued for use', direction: -1 },
+  { id: 'wastage',  label: 'Wastage or spoilage', direction: -1 },
+  { id: 'count',    label: 'Stock count correction', direction: 0 }
+];
+
+export const PURCHASE_STATUS = [
+  { id: 'received', label: 'Received' },
+  { id: 'cancelled', label: 'Cancelled' }
+];
+
+export function makeSupplier(patch) {
+  return Object.assign({
+    id: '', name: '', contactName: '', phone: '', whatsapp: '',
+    address: '', city: '', ntn: '', notes: '',
+    openingBalance: 0,            // what was already owed when they were added
+    createdAt: new Date().toISOString(), archivedAt: null
+  }, patch || {});
+}
+
+export function makeStockItem(patch) {
+  return Object.assign({
+    id: '', code: '', name: '', nameUr: '', category: 'Kitchen',
+    unit: 'piece',
+    reorderLevel: 0,              // below this, the item is flagged low
+    lastCost: 0,                  // rupees per unit, from the most recent purchase
+    notes: '',
+    createdAt: new Date().toISOString(), archivedAt: null
+  }, patch || {});
+}
+
+export function makeStockMove(patch) {
+  return Object.assign({
+    id: '', itemId: '', date: '', reason: 'purchase',
+    qty: 0,                       // always positive; `reason` carries the sign
+    direction: 1,                 // +1 in, -1 out, 0 absolute correction
+    cost: 0,                      // rupees per unit at the time of the move
+    value: 0,                     // frozen: qty x cost, never recomputed
+    purchaseId: '', department: '', notes: '',
+    userId: '', createdAt: new Date().toISOString(), voided: false
+  }, patch || {});
+}
+
+export function makePurchase(patch) {
+  return Object.assign({
+    id: '', code: '', supplierId: '', date: '',
+    billNo: '', notes: '',
+    gross: 0, discount: 0, taxPercent: 0, taxAmount: 0, total: 0,
+    paid: 0,                      // paid at the time of purchase
+    status: 'received',
+    userId: '', createdAt: new Date().toISOString(),
+    cancelledAt: null, cancelledBy: ''
+  }, patch || {});
+}
+
+export function makePurchaseLine(patch) {
+  return Object.assign({
+    id: '', purchaseId: '', itemId: '',
+    name: '', unit: 'piece',      // frozen at the time of purchase
+    qty: 0, cost: 0, amount: 0,
+    createdAt: new Date().toISOString()
   }, patch || {});
 }
 

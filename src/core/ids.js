@@ -36,7 +36,9 @@ export const SEQUENCES = {
   guest:       { prefix: 'G',   pad: 5, yearly: false },
   expense:     { prefix: 'EXP', pad: 4, yearly: true },
   folio:       { prefix: 'F',   pad: 5, yearly: false },
-  order:       { prefix: 'ORD', pad: 4, yearly: true }
+  order:       { prefix: 'ORD', pad: 4, yearly: true },
+  purchase:    { prefix: 'PO',  pad: 4, yearly: true },
+  supplier:    { prefix: 'SUP', pad: 4, yearly: false }
 };
 
 function format(spec, year, n) {
