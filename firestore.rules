@@ -1,0 +1,74 @@
+rules_version = '2';
+
+/**
+ * Licence records for Hotel Register.
+ *
+ * Two kinds of caller reach this database:
+ *
+ *   - the admin panel, signed in with an email and password, which may do
+ *     anything to a licence; and
+ *   - an installed copy of the software, signed in anonymously, which may read
+ *     one licence by key and stamp itself onto it when it activates.
+ *
+ * The apiKey shipped in the software is not a secret — Firebase web keys
+ * identify a project, they do not authorise anything. These rules are what
+ * actually stop a stranger minting themselves a licence.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* An admin is anybody with a document in /admins named after their email
+       address. Adding one is a two-click job in the Firebase console, and
+       removing it takes effect on the next request. */
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    /* The fields an installed copy is allowed to stamp on its own licence. */
+    function activationOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['machineId', 'machineCode', 'activatedAt', 'lastSeenAt', 'appVersion']);
+    }
+
+    /* A licence binds to the first computer that activates it. After that only
+       that same computer may write to it — so a second installation cannot
+       steal a licence by overwriting the binding. */
+    function ownsOrUnclaimed() {
+      return !('machineId' in resource.data)
+        || resource.data.machineId == ''
+        || resource.data.machineId == null
+        || resource.data.machineId == request.resource.data.machineId;
+    }
+
+    match /admins/{email} {
+      // The panel never needs to read this list, and nobody may edit it from
+      // a client. Admins are added and removed in the Firebase console.
+      allow read, write: if false;
+    }
+
+    match /licences/{key} {
+      // A copy of the software looks up exactly one document, by the key it
+      // was given. Keys are 60 bits, so they cannot usefully be guessed.
+      allow get: if signedIn();
+
+      // Listing every licence is a panel-only privilege.
+      allow list: if isAdmin();
+
+      allow create, delete: if isAdmin();
+
+      allow update: if isAdmin()
+        || (signedIn() && activationOnly() && ownsOrUnclaimed());
+    }
+
+    // Nothing else in this project is client-reachable.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

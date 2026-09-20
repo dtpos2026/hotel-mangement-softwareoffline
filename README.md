@@ -112,12 +112,30 @@ Three rules hold the product together:
 `docs/AUDIT.md` records what the original prototype was and why the runtime
 was replaced while the design was kept.
 
+## Licensing
+
+The software will not open until it has been activated with a key. Keys are
+issued from a web panel in `admin-panel/`, hosted on Firebase, and verified
+against Firestore once — after that a copy runs entirely offline, for 45 days
+without seeing the internet at all.
+
+```bash
+npm run panel          # the licence panel at http://127.0.0.1:7788
+npm run deploy:panel   # publish the panel and the Firestore rules
+npm run test:panel     # drive the whole panel with Firebase stubbed out
+```
+
+`docs/LICENSING.md` has the one-time Firebase setup, how a licence behaves,
+how to move a customer to a new computer, and why the API key in the installer
+is not a secret.
+
 ## Tests
 
 ```bash
-npm test                                  # 333 checks, no browser needed
-npx http-server -p 8765 -s . &            # then, for the browser suite:
-node tests/browser.test.mjs               # 71 checks in real Chromium
+npm test                                  # 534 checks, no browser needed
+npx http-server -p 8765 -s . &            # then, for the browser suites:
+node tests/browser.test.mjs               # 76 checks in real Chromium
+npm run test:panel                        # 65 checks, serves itself
 ```
 
 - `tests/run.js` — the 29-point acceptance checklist against the domain layer.
@@ -128,6 +146,10 @@ node tests/browser.test.mjs               # 71 checks in real Chromium
 - `tests/browser.test.mjs` — real Chromium: IndexedDB, the booking form
   refusing a clash, a walk-in, the print pipeline, check-out with a balance,
   the Urdu switch, backup/restore, role permissions.
+- `tests/panel.test.mjs` — the licence panel in Chromium with every Firebase
+  call intercepted and answered in Firestore's own wire format, so issuing,
+  renewing, revoking and releasing a licence are all covered without touching
+  the real project.
 
 The Node suites deliberately run on the localStorage adapter — the one that
 ships for `file://` use — while the browser suite covers IndexedDB.

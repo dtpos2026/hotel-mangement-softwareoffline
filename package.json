@@ -12,12 +12,14 @@
     "dist:portable": "npm run build && electron-builder --win portable --x64",
     "dist:all": "npm run build && electron-builder --win --x64 --ia32",
     "pack": "npm run build && electron-builder --dir",
-    "licence": "echo \"The admin panel is now a web app. Run: npm run panel\"",
     "test": "node tests/run.js && node tests/print.test.js && node tests/licence.test.js && node tests/messaging.test.js && node tests/restaurant.test.js && node tests/integration.test.js",
     "test:browser": "node tests/browser.test.mjs",
     "serve": "npx http-server -p 8080 -c-1 .",
-    "panel": "npx http-server admin-panel -p 7788 -c-1 -o",
-    "deploy:panel": "firebase deploy --only hosting,firestore:rules"
+    "panel": "node tools/panel-sync.mjs && npx http-server admin-panel -p 7788 -c-1 -o",
+    "deploy:panel": "node tools/panel-sync.mjs && firebase deploy --only hosting,firestore:rules",
+    "panel:sync": "node tools/panel-sync.mjs",
+    "deploy:rules": "firebase deploy --only firestore:rules",
+    "test:panel": "node tests/panel.test.mjs"
   },
   "devDependencies": {
     "electron": "^44.4.3",
@@ -34,7 +36,7 @@
   "build": {
     "appId": "pk.digitaltarget.hotelregister",
     "productName": "Hotel Register",
-    "copyright": "Copyright © 2026 Digital Target",
+    "copyright": "Copyright \u00a9 2026 Digital Target",
     "directories": {
       "output": "release",
       "buildResources": "build"
