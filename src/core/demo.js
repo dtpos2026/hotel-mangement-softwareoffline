@@ -16,6 +16,7 @@ import { recordPayment } from '../domain/payments.js';
 import { recordExpense } from '../domain/expenses.js';
 import { setHkStatus } from '../domain/housekeeping.js';
 import { saveCategory, saveMenuItem, saveTable, openOrder, addLine, sendToKitchen } from '../domain/restaurant.js';
+import { saveSupplier, saveItem, recordPurchase, recordMove } from '../domain/inventory.js';
 import { today, addDays } from './dates.js';
 
 export async function seedDemoData(store) {
@@ -221,6 +222,95 @@ export async function seedDemoData(store) {
   const tea = await openOrder(store, { type: 'table', tableId: tables.L1.id, covers: 2, waiter: 'Shahid' });
   await addLine(store, tea.id, { menuItemId: menuItems.D02.id, qty: 2 });
   await addLine(store, tea.id, { menuItemId: menuItems.K03.id, qty: 2 });
+
+  /* Stock, switched on for the same reason as the restaurant: an empty module
+     teaches nobody anything. A property that does not want it turns it off in
+     Settings and the sidebar entry goes with it. */
+  await store.updateSetting('inventory', { enabled: true, trackKitchenStock: true,
+    warnOnLowStock: true, defaultDepartment: 'Kitchen' });
+
+  const suppliers = {};
+  for (const [key, spec] of Object.entries({
+    swat:   { name: 'Swat Traders', contactName: 'Zahid', phone: '0300-1234567', city: 'Mingora',
+              notes: 'Kitchen dry goods. Delivers Tuesdays.' },
+    kirana: { name: 'Kalam Kirana Store', contactName: 'Imran', phone: '0333-9876543', city: 'Kalam' },
+    linen:  { name: 'Mingora Linen House', contactName: 'Saleem', phone: '0345-1122334', city: 'Mingora',
+              notes: 'Towels, sheets, laundry chemicals.' }
+  })) {
+    suppliers[key] = await saveSupplier(store, spec);
+  }
+
+  // Kitchen and housekeeping consumables, with reorder levels set where a
+  // property would actually want warning.
+  const stockSpecs = [
+    ['RICE-B', 'Basmati rice',    'باسمتی چاول',  'Kitchen',      'kg',     40],
+    ['OIL-5',  'Cooking oil',     'کھانا پکانے کا تیل', 'Kitchen', 'litre',  20],
+    ['ATTA',   'Wheat flour',     'آٹا',          'Kitchen',      'kg',     30],
+    ['CHKN',   'Chicken',         'مرغی',         'Kitchen',      'kg',     10],
+    ['SUGAR',  'Sugar',           'چینی',         'Kitchen',      'kg',     15],
+    ['TEA',    'Tea leaves',      'چائے کی پتی',  'Kitchen',      'kg',      5],
+    ['GAS',    'Gas cylinder',    'گیس سلنڈر',    'Kitchen',      'piece',   2],
+    ['SOAP',   'Bath soap',       'صابن',         'Housekeeping', 'piece',  60],
+    ['TOWEL',  'Bath towel',      'تولیہ',        'Housekeeping', 'piece',  20],
+    ['SHEET',  'Bed sheet',       'چادر',         'Housekeeping', 'piece',  15],
+    ['DET',    'Laundry powder',  'واشنگ پاؤڈر',  'Laundry',      'kg',      8],
+    ['BULB',   'LED bulb',        'بلب',          'Maintenance',  'piece',  10]
+  ];
+  const stock = {};
+  for (const [code, name, nameUr, category, unit, reorderLevel] of stockSpecs) {
+    stock[code] = await saveItem(store, { code, name, nameUr, category, unit, reorderLevel });
+  }
+
+  // Two deliveries, one of them part paid, so a supplier account has something
+  // outstanding on the first run.
+  await recordPurchase(store, {
+    supplierId: suppliers.swat.id, date: addDays(today(), -12), billNo: 'ST-4471',
+    lines: [
+      { itemId: stock['RICE-B'].id, qty: 120, cost: 310 },
+      { itemId: stock['OIL-5'].id,  qty: 60,  cost: 620 },
+      { itemId: stock.ATTA.id,      qty: 100, cost: 145 },
+      { itemId: stock.SUGAR.id,     qty: 50,  cost: 165 },
+      { itemId: stock.TEA.id,       qty: 12,  cost: 1400 }
+    ],
+    paid: 50000, notes: 'Monthly kitchen order.'
+  });
+
+  await recordPurchase(store, {
+    supplierId: suppliers.linen.id, date: addDays(today(), -6), billNo: 'MLH-208',
+    lines: [
+      { itemId: stock.TOWEL.id, qty: 60, cost: 480 },
+      { itemId: stock.SHEET.id, qty: 40, cost: 950 },
+      { itemId: stock.SOAP.id,  qty: 300, cost: 42 },
+      { itemId: stock.DET.id,   qty: 25, cost: 380 }
+    ],
+    paid: 0, notes: 'Linen replacement before the season.'
+  });
+
+  await recordPurchase(store, {
+    supplierId: suppliers.kirana.id, date: addDays(today(), -3),
+    lines: [
+      { itemId: stock.CHKN.id, qty: 25, cost: 720 },
+      { itemId: stock.GAS.id,  qty: 4,  cost: 3200 },
+      { itemId: stock.BULB.id, qty: 24, cost: 260 }
+    ],
+    paid: 34000
+  });
+
+  // A fortnight of consumption, so the reports have something in them and one
+  // item sits below its reorder level — which is what the warning is for.
+  const used = [
+    ['RICE-B', 46, 'Kitchen', -9], ['ATTA', 38, 'Kitchen', -8],
+    ['OIL-5', 22, 'Kitchen', -7],  ['CHKN', 18, 'Kitchen', -2],
+    ['SUGAR', 17, 'Kitchen', -5],  ['TEA', 6, 'Kitchen', -4],
+    ['SOAP', 245, 'Housekeeping', -6], ['DET', 18, 'Laundry', -3],
+    ['TOWEL', 8, 'Housekeeping', -2],  ['BULB', 15, 'Maintenance', -1]
+  ];
+  for (const [code, qty, department, dayOffset] of used) {
+    await recordMove(store, { itemId: stock[code].id, qty, reason: 'issue',
+      department, date: addDays(today(), dayOffset) });
+  }
+  await recordMove(store, { itemId: stock.CHKN.id, qty: 2, reason: 'wastage',
+    date: addDays(today(), -1), notes: 'Left out of the fridge overnight' });
 
   await store.updateSetting('app', { demoDataLoaded: true });
   await store.db.flush();

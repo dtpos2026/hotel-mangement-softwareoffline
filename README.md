@@ -85,7 +85,12 @@ Cancelling a purchase puts its stock back, and is refused when any of that
 stock has already been used — reversing it would make the history describe
 something that never happened.
 
-**A4.** Invoices, registration cards, day-close reports and all thirteen
+Four more reports — stock on hand, purchases, supplier balances and stock
+consumed — appear on the Reports screen once the module is on, and disappear
+with it. They share the shape every other report uses, so they export to CSV
+and print on A4 with no special casing.
+
+**A4.** Invoices, registration cards, day-close reports and all seventeen
 reports. Reports are paginated in code, so "Page 2 of 5", the column header and
 the property masthead repeat properly on every sheet.
 
@@ -157,10 +162,10 @@ is not a secret.
 ## Tests
 
 ```bash
-npm test                                  # 672 checks, no browser needed
+npm test                                  # 732 checks, no browser needed
 npx http-server -p 8765 -s . &            # then, for the browser suites:
-node tests/browser.test.mjs               # 115 checks in real Chromium
-npm run test:panel                        # 65 checks, serves itself
+node tests/browser.test.mjs               # 132 checks in real Chromium
+npm run test:panel                        # 71 checks, serves itself
 ```
 
 - `tests/run.js` — the 29-point acceptance checklist against the domain layer.

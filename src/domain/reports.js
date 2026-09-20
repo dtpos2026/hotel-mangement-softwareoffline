@@ -15,6 +15,7 @@ import { arrivalsOn, departuresOn } from './reservations.js';
 import { listUnits } from './units.js';
 import { methodName } from './payments.js';
 import { sourceLabel, reservationStatusOf } from '../core/schema.js';
+import * as inventory from './inventory.js';
 
 const money = v => toMoney(v);
 
@@ -484,6 +485,106 @@ export function housekeepingReport(store, from, to) {
   };
 }
 
+/* ------------------------------------------------------------------ stock */
+
+/**
+ * The stock reports keep their own shape in inventory.js, because the Stock
+ * screen wants the raw figures. These adapt them to the one shape every
+ * report here shares, so they print on A4 and export to CSV with no special
+ * casing anywhere.
+ */
+
+export function stockOnHandReportRows(store) {
+  const r = inventory.stockOnHandReport(store);
+  return {
+    id: 'stock', title: 'Stock on hand', range: null,
+    columns: [
+      { key: 'code', label: 'Code' },
+      { key: 'name', label: 'Item' },
+      { key: 'category', label: 'Category' },
+      { key: 'qty', label: 'On hand', align: 'end',
+        value: row => String(row.qty) + ' ' + row.unit },
+      { key: 'reorderLevel', label: 'Reorder at', align: 'end',
+        value: row => row.reorderLevel || '—' },
+      { key: 'cost', label: 'Unit cost', align: 'end', format: 'money' },
+      { key: 'value', label: 'Value', align: 'end', format: 'money' }
+    ],
+    rows: r.rows,
+    totals: { value: r.totalValue },
+    summary: [
+      { label: 'Items', value: r.rows.length },
+      { label: 'Stock value', value: r.totalValue, format: 'money' },
+      { label: 'Need ordering', value: r.lowCount }
+    ]
+  };
+}
+
+export function purchasesReportRows(store, from, to) {
+  const r = inventory.purchasesReport(store, from, to);
+  return {
+    id: 'purchases', title: 'Purchases', range: { from, to },
+    columns: [
+      { key: 'date', label: 'Date', format: 'date' },
+      { key: 'code', label: 'Number' },
+      { key: 'supplier', label: 'Supplier' },
+      { key: 'billNo', label: 'Their bill no' },
+      { key: 'total', label: 'Total', align: 'end', format: 'money' },
+      { key: 'paid', label: 'Paid', align: 'end', format: 'money' },
+      { key: 'due', label: 'Still owed', align: 'end', format: 'money' }
+    ],
+    rows: r.rows,
+    totals: { total: r.total, paid: r.paid, due: r.due },
+    summary: [
+      { label: 'Bills', value: r.rows.length },
+      { label: 'Bought', value: r.total, format: 'money' },
+      { label: 'Still owed', value: r.due, format: 'money' }
+    ]
+  };
+}
+
+export function supplierBalancesReportRows(store) {
+  const r = inventory.supplierBalancesReport(store);
+  return {
+    id: 'suppliers', title: 'Supplier balances', range: null,
+    columns: [
+      { key: 'name', label: 'Supplier' },
+      { key: 'phone', label: 'Phone' },
+      { key: 'city', label: 'City' },
+      { key: 'purchases', label: 'Bills', align: 'end' },
+      { key: 'billed', label: 'Billed', align: 'end', format: 'money' },
+      { key: 'paid', label: 'Paid', align: 'end', format: 'money' },
+      { key: 'outstanding', label: 'Outstanding', align: 'end', format: 'money' }
+    ],
+    rows: r.rows,
+    totals: { outstanding: r.outstanding },
+    summary: [
+      { label: 'Suppliers', value: r.rows.length },
+      { label: 'Outstanding', value: r.outstanding, format: 'money' }
+    ]
+  };
+}
+
+export function consumptionReportRows(store, from, to) {
+  const r = inventory.consumptionReport(store, from, to);
+  return {
+    id: 'consumption', title: 'Stock consumed', range: { from, to },
+    columns: [
+      { key: 'name', label: 'Item' },
+      { key: 'qty', label: 'Used', align: 'end',
+        value: row => String(row.qty) + ' ' + row.unit },
+      { key: 'wastage', label: 'Of which wasted', align: 'end',
+        value: row => row.wastage ? String(row.wastage) + ' ' + row.unit : '—' },
+      { key: 'value', label: 'Value', align: 'end', format: 'money' }
+    ],
+    rows: r.rows,
+    totals: { value: r.value },
+    summary: [
+      { label: 'Items used', value: r.rows.length },
+      { label: 'Cost of what was used', value: r.value, format: 'money' }
+    ]
+  };
+}
+
 export const REPORTS = [
   { id: 'register',    label: 'Guest register',    build: registerReport },
   { id: 'occupancy',   label: 'Occupancy',         build: occupancyReport },
@@ -497,8 +598,19 @@ export const REPORTS = [
   { id: 'expenses',    label: 'Expenses',          build: expensesReport },
   { id: 'guests',      label: 'Guest history',     build: guestHistoryReport },
   { id: 'units',       label: 'Unit performance',  build: unitPerformanceReport },
-  { id: 'housekeeping', label: 'Housekeeping',     build: housekeepingReport }
+  { id: 'housekeeping', label: 'Housekeeping',     build: housekeepingReport },
+
+  // Only offered once a property switches stock on; see visibleReports().
+  { id: 'stock',       label: 'Stock on hand',     build: (s) => stockOnHandReportRows(s), module: 'inventory' },
+  { id: 'purchases',   label: 'Purchases',         build: purchasesReportRows,             module: 'inventory' },
+  { id: 'suppliers',   label: 'Supplier balances', build: (s) => supplierBalancesReportRows(s), module: 'inventory' },
+  { id: 'consumption', label: 'Stock consumed',    build: consumptionReportRows,           module: 'inventory' }
 ];
+
+/** The reports this property can actually run, given the modules it uses. */
+export function visibleReports(store) {
+  return REPORTS.filter(r => r.module !== 'inventory' || inventory.isEnabled(store));
+}
 
 export function buildReport(store, id, from, to, opts) {
   const spec = REPORTS.find(r => r.id === id) || REPORTS[0];

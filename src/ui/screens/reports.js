@@ -6,7 +6,7 @@
 import { h } from '../dom.js';
 import { card, dataTable, emptyState, pageHead, filterBar, rangePicker } from '../components.js';
 import { ok as toastOk, fail } from '../feedback.js';
-import { REPORTS, buildReport } from '../../domain/reports.js';
+import { visibleReports, buildReport } from '../../domain/reports.js';
 import { toCsv, downloadFile } from '../../core/backup.js';
 import { formatMoney } from '../../core/money.js';
 import { presetRange, formatDate } from '../../core/dates.js';
@@ -30,7 +30,7 @@ export function render(ctx) {
     ]),
 
     card({ flush: true }, h('div', { style: { padding: '10px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' } },
-      REPORTS.map(r => h('button.chip', {
+      visibleReports(store).map(r => h('button.chip', {
         type: 'button',
         class: r.id === state.report ? 'is-on' : null,
         text: r.label,

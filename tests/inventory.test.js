@@ -241,6 +241,62 @@ eq('consumption is valued at what the stock cost', useRpt.value,
 ok('a cancelled movement is left out of consumption',
   useRpt.rows.find(r => r.name === 'Basmati rice').qty === 12);
 
+suite('The stock reports reach the Reports screen');
+
+const allReports = await import('../src/domain/reports.js');
+
+// They must not clutter the Reports screen for a property that does not use
+// stock, and must appear the moment it does.
+await store.updateSetting('inventory', Object.assign({}, store.setting('inventory'), { enabled: false }));
+const hiddenIds = allReports.visibleReports(store).map(r => r.id);
+ok('no stock report is offered while the module is off',
+  !hiddenIds.some(id => ['stock', 'purchases', 'suppliers', 'consumption'].includes(id)), hiddenIds.join(','));
+ok('the ordinary reports are still all there', hiddenIds.length === 13, String(hiddenIds.length));
+
+await store.updateSetting('inventory', Object.assign({}, store.setting('inventory'), { enabled: true }));
+const shownIds = allReports.visibleReports(store).map(r => r.id);
+ok('all four appear once it is on', shownIds.length === 17, String(shownIds.length));
+
+// Every report on that screen shares one shape, which is what lets one table,
+// one CSV exporter and one A4 layout serve all of them.
+for (const id of ['stock', 'purchases', 'suppliers', 'consumption']) {
+  const rpt = allReports.buildReport(store, id, D0, D2);
+  ok(`"${id}" reports its own id`, rpt.id === id, rpt.id);
+  ok(`"${id}" has a title`, typeof rpt.title === 'string' && rpt.title.length > 0);
+  ok(`"${id}" declares columns`, Array.isArray(rpt.columns) && rpt.columns.length > 0);
+  ok(`"${id}" returns rows`, Array.isArray(rpt.rows));
+  ok(`"${id}" carries a totals object`, rpt.totals && typeof rpt.totals === 'object');
+  ok(`"${id}" summarises itself`, Array.isArray(rpt.summary) && rpt.summary.length > 0);
+  ok(`"${id}" every column has a key and a label`,
+    rpt.columns.every(c => c.key && c.label));
+  ok(`"${id}" every money total is a whole number of rupees`,
+    Object.values(rpt.totals).every(v => Number.isInteger(v)));
+}
+
+// A point-in-time report must not claim to cover a date range.
+eq('stock on hand is not a period report', allReports.buildReport(store, 'stock', D0, D2).range, null);
+eq('supplier balances are not a period report', allReports.buildReport(store, 'suppliers', D0, D2).range, null);
+ok('purchases is a period report', !!allReports.buildReport(store, 'purchases', D0, D2).range);
+
+// The figures must match what the Stock screen shows, or the two disagree.
+const rptStock = allReports.buildReport(store, 'stock', D0, D2);
+eq('the report values the shelves the same as the screen',
+  rptStock.totals.value, inv.stockOnHandReport(store).totalValue);
+const rptSup = allReports.buildReport(store, 'suppliers', D0, D2);
+eq('the report owes suppliers the same as the screen',
+  rptSup.totals.outstanding, inv.supplierBalancesReport(store).outstanding);
+
+// A4 printing and CSV export both walk columns; a column that names a key the
+// rows do not have would print an empty sheet.
+const a4 = await import('../src/print/a4.js');
+for (const id of ['stock', 'purchases', 'suppliers', 'consumption']) {
+  const rpt = allReports.buildReport(store, id, D0, D2);
+  const doc = a4.reportDocument(store, rpt);
+  ok(`"${id}" prints an A4 sheet`, doc.indexOf(rpt.title) > -1);
+  ok(`"${id}" prints its column headings`,
+    rpt.columns.every(c => doc.indexOf(c.label) > -1));
+}
+
 /* ----------------------------------------------------------- permissions */
 
 suite('Permissions');

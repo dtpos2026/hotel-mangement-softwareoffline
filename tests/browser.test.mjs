@@ -506,16 +506,30 @@ await page.waitForTimeout(400);
 
 /* ------------------------------------------------------ stock & purchasing */
 
-suite('Stock: the module is hidden until it is switched on');
-ok('Stock is not in the nav to begin with',
+suite('Stock: the module obeys its switch');
+// The sample data turns stock on, so the gate is tested by closing it.
+ok('Stock is in the nav while the module is on',
+  (await page.evaluate(() => window.__hms.app.visibleScreens().map(s => s.id))).indexOf('inventory') > -1);
+
+await page.evaluate(() => window.__hms.store.updateSetting('inventory',
+  Object.assign({}, window.__hms.store.setting('inventory'), { enabled: false })));
+await page.waitForTimeout(400);
+await page.evaluate(() => window.__hms.app.render());
+await page.waitForTimeout(400);
+ok('switching it off takes Stock out of the nav',
   (await page.evaluate(() => window.__hms.app.visibleScreens().map(s => s.id))).indexOf('inventory') === -1);
+ok('...and takes its reports off the Reports screen',
+  (await page.evaluate(async () => {
+    const r = await import('/src/domain/reports.js');
+    return r.visibleReports(window.__hms.store).map(x => x.id);
+  })).indexOf('stock') === -1);
 
 await page.evaluate(() => window.__hms.store.updateSetting('inventory',
   Object.assign({}, window.__hms.store.setting('inventory'), { enabled: true })));
-await page.waitForTimeout(500);
+await page.waitForTimeout(400);
 await page.evaluate(() => window.__hms.app.render());
 await page.waitForTimeout(400);
-ok('switching it on puts Stock in the nav',
+ok('switching it back on restores both',
   (await page.evaluate(() => window.__hms.app.visibleScreens().map(s => s.id))).indexOf('inventory') > -1);
 
 await go('inventory');
@@ -524,57 +538,77 @@ const tabTo = async (label) => {
   await page.waitForTimeout(400);
 };
 const actionBtn = (label) => page.locator('.page__actions button', { hasText: label }).first();
+const stockState = () => page.evaluate(async () => {
+  const inv = await import('/src/domain/inventory.js');
+  const s = window.__hms.store;
+  return {
+    items: inv.listItems(s).length,
+    suppliers: inv.listSuppliers(s).length,
+    purchases: inv.listPurchases(s).length,
+    owed: inv.summary(s).suppliersOwed,
+    value: inv.summary(s).stockValue
+  };
+});
 
-suite('Stock: adding a supplier and items');
+suite('Stock: the sample data fills the module');
+const seeded = await stockState();
+ok('items are stocked', seeded.items === 12, String(seeded.items));
+ok('suppliers are set up', seeded.suppliers === 3, String(seeded.suppliers));
+ok('deliveries are recorded', seeded.purchases === 3, String(seeded.purchases));
+ok('a supplier is owed something, so the screen is not all zeros', seeded.owed > 0);
+ok('the shelves are worth something', seeded.value > 0);
+ok('the low-stock warning is showing', await page.locator('.alert--warn').count() > 0);
+ok('the nav carries a badge for what needs ordering',
+  (await page.evaluate(() => window.__hms.app.navCounts().inventory)) > 0);
+
+suite('Stock: adding a supplier and an item');
 await tabTo('Suppliers');
 await actionBtn('Add supplier').click();
 await page.waitForTimeout(400);
-await page.fill('.modal [name="name"]', 'Swat Traders');
+await page.fill('.modal [name="name"]', 'Bahrain Poultry');
 await page.fill('.modal [name="phone"]', '0300-1234567');
 await page.locator('.modal__foot button', { hasText: 'Add supplier' }).click();
 await page.waitForTimeout(900);
 await clearToasts();
-ok('the supplier was saved',
-  (await page.evaluate(async () => {
-    const inv = await import('/src/domain/inventory.js');
-    return inv.listSuppliers(window.__hms.store).length;
-  })) === 1);
+ok('the supplier was added to the ones already there',
+  (await stockState()).suppliers === seeded.suppliers + 1);
 
 await tabTo('On hand');
-for (const [name, unit, reorder] of [['Basmati rice', 'kg', '20'], ['Cooking oil', 'litre', '10']]) {
-  await actionBtn('Add item').click();
-  await page.waitForTimeout(400);
-  await page.fill('.modal [name="name"]', name);
-  await page.selectOption('.modal [name="unit"]', unit);
-  await page.fill('.modal [name="reorderLevel"]', reorder);
-  await page.locator('.modal__foot button', { hasText: 'Add item' }).click();
-  await page.waitForTimeout(800);
-  await clearToasts();
-}
-ok('both items are listed', await page.locator('.table tbody tr').count() === 2);
+await actionBtn('Add item').click();
+await page.waitForTimeout(400);
+await page.fill('.modal [name="name"]', 'Fresh eggs');
+await page.selectOption('.modal [name="unit"]', 'dozen');
+await page.fill('.modal [name="reorderLevel"]', '10');
+await page.locator('.modal__foot button', { hasText: 'Add item' }).click();
+await page.waitForTimeout(900);
+await clearToasts();
+ok('the item was added', (await stockState()).items === seeded.items + 1);
 ok('a brand new item has nothing on hand',
-  (await page.locator('.table tbody tr').first().innerText()).indexOf('0 kg') > -1);
+  (await page.evaluate(async () => {
+    const inv = await import('/src/domain/inventory.js');
+    const s = window.__hms.store;
+    return inv.onHand(s, inv.listItems(s).find(i => i.name === 'Fresh eggs').id);
+  })) === 0);
 
 suite('Stock: recording a purchase');
 await tabTo('Purchases');
 await actionBtn('Record purchase').click();
 await page.waitForTimeout(500);
 
-const qtyBoxes = () => page.locator('.po-line__qty');
-const costBoxes = () => page.locator('.po-line__cost');
-await qtyBoxes().nth(0).fill('50');
-await costBoxes().nth(0).fill('300');
+await page.locator('.po-line select').nth(0).selectOption({ label: 'Fresh eggs (dz)' });
+await page.locator('.po-line__qty').nth(0).fill('50');
+await page.locator('.po-line__cost').nth(0).fill('300');
 await page.locator('.modal button', { hasText: 'Add another item' }).click();
 await page.waitForTimeout(300);
 await page.locator('.po-line select').nth(1).selectOption({ label: 'Cooking oil (L)' });
-await qtyBoxes().nth(1).fill('20');
-await costBoxes().nth(1).fill('600');
+await page.locator('.po-line__qty').nth(1).fill('20');
+await page.locator('.po-line__cost').nth(1).fill('600');
 await page.waitForTimeout(300);
 
 const lineAmounts = await page.evaluate(() =>
   Array.from(document.querySelectorAll('.po-line__amount')).map(e => e.textContent.trim()));
-// This is the bug that a screenshot caught: a line total left at zero while
-// the subtotal was right, because the row only redrew when a line was added.
+// This is the bug a screenshot caught: a line total left at zero while the
+// subtotal was right, because the row only redrew when a line was added.
 ok('every line shows its own amount while it is being typed',
   lineAmounts.join(' | ') === 'Rs 15,000 | Rs 12,000', lineAmounts.join(' | '));
 ok('the running total adds the lines up',
@@ -590,23 +624,20 @@ await page.waitForTimeout(1400);
 ok('the purchase is confirmed by number', (await toastText()).indexOf('PO-') > -1);
 await clearToasts();
 
-const afterBuy = await page.evaluate(async () => {
-  const inv = await import('/src/domain/inventory.js');
-  const s = window.__hms.store;
-  const items = inv.listItems(s);
-  return {
-    onHand: items.map(i => i.name + '=' + inv.onHand(s, i.id)).sort().join(','),
-    owed: inv.summary(s).suppliersOwed,
-    value: inv.summary(s).stockValue
-  };
-});
-ok('the stock arrived on the shelf', afterBuy.onHand === 'Basmati rice=50,Cooking oil=20', afterBuy.onHand);
-ok('the supplier account followed from the same form', afterBuy.owed === 17000, String(afterBuy.owed));
-ok('the shelves are valued at what was paid', afterBuy.value === 27000, String(afterBuy.value));
+const afterBuy = await stockState();
+ok('the eggs reached the shelf',
+  (await page.evaluate(async () => {
+    const inv = await import('/src/domain/inventory.js');
+    const s = window.__hms.store;
+    return inv.onHand(s, inv.listItems(s).find(i => i.name === 'Fresh eggs').id);
+  })) === 50);
+ok('the supplier account followed from the same form',
+  afterBuy.owed === seeded.owed + 17000, afterBuy.owed + ' vs ' + seeded.owed);
+ok('the shelves are worth more than before', afterBuy.value > seeded.value);
 
 suite('Stock: the item rail and a movement');
 await tabTo('On hand');
-await page.locator('.table tbody tr').first().click();
+await page.locator('.table tbody tr', { hasText: 'Fresh eggs' }).click();
 await page.waitForTimeout(500);
 ok('the rail opens on the chosen item', await page.locator('.rail').count() === 1);
 ok('it shows the movement that put the stock there', await page.locator('.move').count() === 1);
@@ -615,7 +646,7 @@ ok('the movement is marked as coming in',
 
 await page.locator('.rail button', { hasText: 'Record movement' }).click();
 await page.waitForTimeout(500);
-await page.fill('.modal [name="qty"]', '35');
+await page.fill('.modal [name="qty"]', '42');
 await page.locator('.modal__foot button', { hasText: 'Record' }).click();
 await page.waitForTimeout(1200);
 await clearToasts();
@@ -623,16 +654,13 @@ ok('issuing stock reduces what is on hand',
   (await page.evaluate(async () => {
     const inv = await import('/src/domain/inventory.js');
     const s = window.__hms.store;
-    return inv.onHand(s, inv.listItems(s).find(i => i.name === 'Basmati rice').id);
-  })) === 15);
-ok('falling below the reorder level raises a warning on the screen',
-  await page.locator('.alert--warn').count() > 0);
-ok('...and a badge on the nav',
-  (await page.evaluate(() => window.__hms.app.navCounts().inventory)) === 1);
+    return inv.onHand(s, inv.listItems(s).find(i => i.name === 'Fresh eggs').id);
+  })) === 8);
 
 suite('Stock: more cannot go out than exists');
 await actionBtn('Record movement').click();
 await page.waitForTimeout(500);
+await page.selectOption('.modal [name="itemId"]', { label: 'Fresh eggs (dz)' });
 await page.fill('.modal [name="qty"]', '9999');
 await page.locator('.modal__foot button', { hasText: 'Record' }).click();
 await page.waitForTimeout(900);
@@ -641,23 +669,22 @@ ok('the domain refuses it, in plain words', (await toastText()).toLowerCase().in
 // That refusal is reported through the app's error handler, so it also lands
 // in the console. It is expected here and nowhere else, so it is taken out of
 // the collected errors by its exact text rather than by loosening the filter.
-const expectedRefusal = pageErrors.findIndex(e => /Only .* of Basmati rice are in stock/.test(e));
-ok('the refusal was logged once, and is accounted for', expectedRefusal > -1,
-  pageErrors.join(' | '));
+const expectedRefusal = pageErrors.findIndex(e => /Only .* of Fresh eggs are in stock/.test(e));
+ok('the refusal was logged once, and is accounted for', expectedRefusal > -1, pageErrors.join(' | '));
 if (expectedRefusal > -1) pageErrors.splice(expectedRefusal, 1);
 
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 await clearToasts();
 
-suite('Stock: a purchase can be opened and cancelled');
+suite('Stock: a purchase can be opened, and reversal is refused once used');
 await tabTo('Purchases');
 await page.locator('.table tbody tr').first().click();
 await page.waitForTimeout(600);
 ok('the bill lists what was delivered', await page.locator('.modal .table tbody tr').count() === 2);
 ok('it shows what is still owed', (await page.locator('.modal').innerText()).indexOf('Still owed') > -1);
 
-// The rice has been cooked, so this purchase must not be reversible.
+// The eggs have been used, so this purchase must not be reversible.
 await page.locator('.modal button', { hasText: 'Cancel this purchase' }).click();
 await page.waitForTimeout(500);
 await page.locator('.modal__foot button', { hasText: 'Confirm' }).last().click();
@@ -672,6 +699,22 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
+
+suite('Stock: the reports are on the Reports screen');
+await go('reports');
+await page.waitForTimeout(500);
+const chipNames = await page.evaluate(() =>
+  Array.from(document.querySelectorAll('.chip')).map(c => c.textContent.trim()));
+for (const name of ['Stock on hand', 'Purchases', 'Supplier balances', 'Stock consumed']) {
+  ok(`"${name}" is offered as a report`, chipNames.indexOf(name) > -1, chipNames.join(', '));
+}
+for (const name of ['Stock on hand', 'Supplier balances', 'Stock consumed']) {
+  await page.locator('.chip', { hasText: name }).first().click();
+  await page.waitForTimeout(600);
+  ok(`"${name}" renders rows`, await page.locator('.table tbody tr').count() > 0);
+  ok(`"${name}" titles its card`,
+    (await page.locator('.card__title').last().innerText()) === name);
+}
 
 suite('Role permissions in the UI');
 const asReception = await page.evaluate(async () => {
