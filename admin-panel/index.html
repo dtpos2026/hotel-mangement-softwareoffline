@@ -11,9 +11,58 @@
 </head>
 <body>
   <div id="root">
-    <div class="booting">Loading the licence panel…</div>
+    <div class="booting" id="booting">
+      <p>Loading the licence panel…</p>
+    </div>
   </div>
   <noscript>This panel needs JavaScript.</noscript>
+
+  <!--
+    A module script that fails to load does so silently: the page would sit on
+    "Loading…" for ever with the reason only in the console. This says what
+    went wrong on the page itself, which is the difference between a deploy
+    someone can fix and one they can only stare at.
+  -->
+  <script>
+    (function () {
+      var failed = false;
+      function report(detail) {
+        if (failed) return;
+        failed = true;
+        var box = document.getElementById('booting');
+        if (!box) return;
+        box.className = 'booting booting--bad';
+        box.innerHTML =
+          '<p><strong>The panel could not start.</strong></p>' +
+          '<p class="booting__detail"></p>' +
+          '<p class="booting__hint">If this was just deployed, the shared files in ' +
+          '<code>admin-panel/lib/</code> are probably missing. Run ' +
+          '<code>npm run deploy:panel</code> rather than <code>firebase deploy</code> ' +
+          'on its own — it copies them first.</p>';
+        box.querySelector('.booting__detail').textContent = detail || '';
+      }
+
+      window.addEventListener('error', function (e) {
+        // A missing module served as HTML shows up here, not as a 404.
+        if (e && e.target && e.target.tagName === 'SCRIPT') {
+          report('Could not load ' + (e.target.src || 'the panel script') + '.');
+        } else if (e && e.message) {
+          report(e.message);
+        }
+      }, true);
+
+      window.addEventListener('unhandledrejection', function (e) {
+        report((e && e.reason && e.reason.message) || 'The panel failed to start.');
+      });
+
+      // Belt and braces: if nothing has rendered, say so rather than hang.
+      setTimeout(function () {
+        if (document.getElementById('booting')) {
+          report('The panel script did not run. Its files may be missing or served as the wrong type.');
+        }
+      }, 8000);
+    })();
+  </script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

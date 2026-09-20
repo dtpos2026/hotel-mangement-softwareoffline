@@ -92,6 +92,11 @@ that person loses access on their next request.
 npm run deploy:panel
 ```
 
+Use that command rather than `firebase deploy` on its own: it copies the shared
+files into `admin-panel/lib/` first. Those copies are committed, so a plain
+`firebase deploy` works too — but only `npm run deploy:panel` guarantees they
+match the current licence model.
+
 That publishes `firestore.rules` and the panel itself. The panel is then at
 `https://<project-id>.web.app`.
 
@@ -180,6 +185,13 @@ renews early is not robbed of the days they had left.
 ---
 
 ## Troubleshooting
+
+**The panel shows "The panel could not start"** — the files in
+`admin-panel/lib/` did not reach Firebase. Run `npm run deploy:panel` and
+deploy again. (An earlier version sat on "Loading…" for ever in this case,
+because a catch-all hosting rewrite turned the missing file into a 200 that
+served HTML where JavaScript was expected. Both the rewrite and the missing
+files are fixed.)
 
 **"This account is not on the admins list"** — step 3 above. The document ID
 must be the email address exactly, including case.

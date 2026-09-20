@@ -401,6 +401,38 @@ if (process.env.SHOT) {
   await page.keyboard.press('Escape');
 }
 
+suite('A broken deploy says so');
+
+// The panel was once deployed with admin-panel/lib/ missing, because those
+// files were generated and not committed. The catch-all hosting rewrite then
+// served the missing module as index.html with a 200, so the browser got HTML
+// where it expected JavaScript, the module died silently, and the page sat on
+// "Loading…" for ever with the reason only in the console.
+const brokenPage = await browser.newPage({ viewport: { width: 900, height: 700 } });
+await brokenPage.route('**/lib/**', route => route.fulfill({
+  status: 200, contentType: 'text/html', body: '<!doctype html><html></html>'
+}));
+await brokenPage.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+await brokenPage.waitForTimeout(9000);
+const brokenText = await brokenPage.evaluate(() => document.body.innerText);
+
+ok('a panel that cannot start no longer sits on "Loading…"',
+  brokenText.indexOf('Loading the licence panel') === -1, brokenText.slice(0, 120));
+ok('it says plainly that it could not start',
+  brokenText.indexOf('could not start') > -1);
+ok('it names the likely cause and the command that fixes it',
+  brokenText.indexOf('admin-panel/lib/') > -1 && brokenText.indexOf('deploy:panel') > -1);
+await brokenPage.close();
+
+// And the files that were missing are the ones the panel actually needs.
+const libFiles = ['lib/licence-model.js', 'lib/dom.js', 'lib/firebase-config.js'];
+for (const f of libFiles) {
+  const res = await fetch(BASE + '/' + f);
+  ok(`${f} is present and served as JavaScript`,
+    res.ok && /javascript/.test(res.headers.get('content-type') || ''),
+    res.status + ' ' + res.headers.get('content-type'));
+}
+
 suite('Page health');
 ok('no script errors anywhere in that run', errs.length === 0, errs.join(' | '));
 
