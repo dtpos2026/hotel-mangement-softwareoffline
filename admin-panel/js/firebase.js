@@ -81,6 +81,48 @@ export class Panel {
     try { sessionStorage.removeItem(SESSION_KEY); } catch { /* private mode */ }
   }
 
+  /**
+   * Answers the question the panel cannot otherwise answer: will a customer's
+   * copy of the software be able to activate?
+   *
+   * The desktop app signs in anonymously so it can read its own licence
+   * without being handed credentials. If the Anonymous provider is switched
+   * off, every activation fails with ADMIN_ONLY_OPERATION — on the customer's
+   * machine, where nobody can see why. Doing the same sign-in here surfaces it
+   * in the panel, before a key is sent out.
+   */
+  async checkActivationWorks() {
+    try {
+      const body = await this._fetch(
+        `${IDENTITY}/accounts:signUp?key=${encodeURIComponent(this.config.apiKey)}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ returnSecureToken: true }) },
+        'activation check'
+      );
+      // Tidy up after the probe: the anonymous account has served its purpose.
+      if (body && body.idToken) {
+        await this._fetch(
+          `${IDENTITY}/accounts:delete?key=${encodeURIComponent(this.config.apiKey)}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: body.idToken }) },
+          'cleanup'
+        ).catch(() => {});
+      }
+      return { ok: true, message: 'Customers can activate. Anonymous sign-in is on.' };
+    } catch (err) {
+      const raw = String(err.raw || err.message || '');
+      if (/ADMIN_ONLY_OPERATION|OPERATION_NOT_ALLOWED/.test(raw)) {
+        return {
+          ok: false,
+          fixable: true,
+          message: 'Customers cannot activate: Anonymous sign-in is switched off for this project.',
+          fix: 'Firebase console → Authentication → Sign-in method → enable Anonymous.'
+        };
+      }
+      return { ok: false, message: err.message };
+    }
+  }
+
   /** Sends the "reset your password" email Firebase already knows how to send. */
   async sendPasswordReset(email) {
     await this._fetch(

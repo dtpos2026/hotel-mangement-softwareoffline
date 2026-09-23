@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Digital Target mark: a square of four quadrants, each holding the same right
+  triangle, so every hypotenuse runs the same way and the brand purple shows
+  through as four matching slivers. Drawn rather than embedded as a bitmap so
+  it stays sharp on a 4K screen and in a printed receipt header.
+
+  It takes its colour from `currentColor`, so one file serves the white-on-
+  purple lockup and the purple-on-white one without a second asset.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Digital Target">
+  <g fill="currentColor">
+    <path d="M1 1  H48 L1 48 Z"  />
+    <path d="M52 1  H99 L52 48 Z" />
+    <path d="M1 52 H48 L1 99 Z"  />
+    <path d="M52 52 H99 L52 99 Z" />
+  </g>
+</svg>

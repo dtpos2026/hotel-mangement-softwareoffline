@@ -17,7 +17,7 @@ const path = require('node:path');
 const { createHmac, createHash } = require('node:crypto');
 
 /** Re-check with Firestore this often, when the internet happens to be there. */
-const RECHECK_DAYS = 7;
+const RECHECK_DAYS = 1;
 /** How long a licence may go unverified before the app insists on a re-check. */
 const GRACE_DAYS = 45;
 

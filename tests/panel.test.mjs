@@ -83,6 +83,7 @@ const docName = id => `projects/dt-hotel-mangemnet/databases/(default)/documents
 
 let lastPatch = null;
 let signInAttempts = 0;
+let anonymousAllowed = true;
 
 const json = (route, body, status) => route.fulfill({
   status: status || 200, contentType: 'application/json', body: JSON.stringify(body)
@@ -100,6 +101,12 @@ async function stub(route) {
     }
     return json(route, { email: body.email, idToken: 'id-token', refreshToken: 'refresh-token', expiresIn: '3600', localId: 'uid1' });
   }
+  if (url.includes('accounts:signUp')) {
+    // Anonymous sign-up: what a customer's copy does when it activates.
+    if (anonymousAllowed) return json(route, { idToken: 'anon-token', localId: 'anon1', expiresIn: '3600' });
+    return json(route, { error: { message: 'ADMIN_ONLY_OPERATION' } }, 400);
+  }
+  if (url.includes('accounts:delete')) return json(route, {});
   if (url.includes('accounts:sendOobCode')) return json(route, { email: body.email });
   if (url.includes('accounts:update')) return json(route, { idToken: 'id-token-2', refreshToken: 'refresh-token', expiresIn: '3600' });
   if (url.includes('securetoken.googleapis.com')) {
@@ -170,6 +177,17 @@ await page.route('**securetoken.googleapis.com/**', stub);
 await page.route('**firestore.googleapis.com/**', stub);
 
 const text = () => page.evaluate(() => document.body.innerText);
+/** Clears any session and signs in, so a suite can stand on its own. */
+const signInFresh = async () => {
+  await page.evaluate(() => { try { sessionStorage.clear(); } catch { /* private mode */ } });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  await page.fill('input[type=email]', ADMIN_EMAIL);
+  await page.fill('input[type=password]', ADMIN_PASSWORD);
+  await page.click('button[type=submit]');
+  await page.waitForTimeout(1200);
+};
+
 const toastText = () => page.evaluate(() => Array.from(document.querySelectorAll('.toast')).map(t => t.innerText).join('\n'));
 const clearToasts = () => page.evaluate(() => document.querySelectorAll('.toast').forEach(t => t.remove()));
 
@@ -305,22 +323,78 @@ ok('the drawer opens on the chosen licence',
 ok('the bound computer is shown', (await page.locator('.drawer').innerText()).includes('A1B2-C3D4-E5F6'));
 ok('the plan is named', (await page.locator('.drawer').innerText()).includes('Professional'));
 
-// Revoke
-await page.locator('.drawer button', { hasText: 'Revoke' }).click();
+// Suspend — the reversible one, for an unpaid instalment or a dispute.
+await page.locator('.drawer button', { hasText: 'Suspend' }).click();
 await page.waitForTimeout(250);
-ok('revoking asks first', (await page.locator('.modal__title').innerText()) === 'Are you sure?');
+ok('suspending asks first', (await page.locator('.modal__title').innerText()) === 'Are you sure?');
+ok('it promises the data is safe',
+  (await page.locator('.modal__body').innerText()).indexOf('Nothing is deleted') > -1);
 await page.locator('.modal button', { hasText: 'Yes, go ahead' }).click();
 await page.waitForTimeout(800);
-ok('the licence is revoked upstream', docs.get('4F2K9XQP7M3A').revoked === true);
-ok('only the revoked flag was written', Object.keys(lastPatch.patch).join(',') === 'revoked');
-ok('the drawer now offers to restore it',
-  await page.locator('.drawer button', { hasText: 'Restore licence' }).count() === 1);
+
+ok('the licence is suspended upstream', docs.get('4F2K9XQP7M3A').lifecycle === 'suspended');
+// Older copies of the software know only the boolean, so it has to move too,
+// otherwise a suspension would be silently ignored by an installed build.
+ok('the old revoked flag moves with it, so older builds still stop',
+  docs.get('4F2K9XQP7M3A').revoked === true);
+ok('who suspended it is recorded', docs.get('4F2K9XQP7M3A').lifecycleChangedBy === ADMIN_EMAIL);
+ok('when it was suspended is recorded', String(docs.get('4F2K9XQP7M3A').lifecycleChangedAt).length > 10);
+ok('only lifecycle fields were written',
+  Object.keys(lastPatch.patch).sort().join(',') === 'lifecycle,lifecycleChangedAt,lifecycleChangedBy,revoked',
+  Object.keys(lastPatch.patch).join(','));
+ok('the customer details were not touched', docs.get('4F2K9XQP7M3A').businessName === 'Kalam Continental');
+ok('the machine binding was not touched', docs.get('4F2K9XQP7M3A').machineId.length === 64);
+ok('the row now reads as suspended',
+  (await page.locator('.drawer .pill').first().innerText()).toLowerCase().indexOf('suspend') > -1);
+ok('the drawer now offers to resume it',
+  await page.locator('.drawer button', { hasText: 'Resume' }).count() === 1);
 await clearToasts();
 
-await page.locator('.drawer button', { hasText: 'Restore licence' }).click();
+await page.locator('.drawer button', { hasText: 'Resume' }).click();
 await page.waitForTimeout(800);
-ok('restoring puts it back', docs.get('4F2K9XQP7M3A').revoked === false);
+ok('resuming puts it back to active', docs.get('4F2K9XQP7M3A').lifecycle === 'active');
+ok('and clears the old boolean with it', docs.get('4F2K9XQP7M3A').revoked === false);
 await clearToasts();
+
+// Revoke — the end of the sale, but still reversible if a customer returns.
+await page.locator('.drawer button', { hasText: 'Revoke' }).click();
+await page.waitForTimeout(250);
+ok('revoking steers you to Suspend when the customer may come back',
+  (await page.locator('.modal__body').innerText()).indexOf('Use Suspend instead') > -1);
+await page.locator('.modal button', { hasText: 'Yes, go ahead' }).click();
+await page.waitForTimeout(800);
+ok('the licence is revoked upstream', docs.get('4F2K9XQP7M3A').lifecycle === 'revoked');
+ok('a revoked licence offers reactivation rather than resume',
+  await page.locator('.drawer button', { hasText: 'Reactivate' }).count() === 1);
+ok('and offers no second Revoke',
+  await page.locator('.drawer button', { hasText: 'Revoke' }).count() === 0);
+await clearToasts();
+
+await page.locator('.drawer button', { hasText: 'Reactivate' }).click();
+await page.waitForTimeout(800);
+ok('reactivating brings it back', docs.get('4F2K9XQP7M3A').lifecycle === 'active');
+await clearToasts();
+
+suite('A licence written before suspension existed');
+// These are already in Firestore and must keep behaving exactly as they did.
+docs.set('LEGACY00KEY1', Object.assign({}, docs.get('4F2K9XQP7M3A'), {
+  key: 'HR-LEGA-CY00-KEY1', businessName: 'Legacy Guest House',
+  issuedAt: '2025-01-01T00:00:00.000Z', revoked: true, machineId: '', machineCode: ''
+}));
+delete docs.get('LEGACY00KEY1').lifecycle;
+await page.keyboard.press('Escape');
+await page.locator('.topbar button', { hasText: 'Refresh' }).click();
+await page.waitForTimeout(900);
+await page.locator('.row', { hasText: 'Legacy Guest House' }).click();
+await page.waitForTimeout(400);
+ok('an old revoked record still reads as revoked',
+  (await page.locator('.drawer .pill').first().innerText()).toLowerCase().indexOf('revok') > -1);
+ok('and can be reactivated like any other',
+  await page.locator('.drawer button', { hasText: 'Reactivate' }).count() === 1);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+await page.locator('.row', { hasText: 'Kalam Continental' }).click();
+await page.waitForTimeout(400);
 
 // Release the machine binding
 await page.locator('.drawer button', { hasText: 'Release the computer' }).click();
@@ -402,6 +476,39 @@ if (process.env.SHOT) {
   await page.keyboard.press('Escape');
 }
 
+suite('The server check predicts activation failures');
+
+// The panel signing in says nothing about whether the software can: the panel
+// uses a password, the software signs in anonymously, and those are separate
+// switches in Firebase. This is the bug that reached a customer's PC as
+// "Sign-in failed: ADMIN_ONLY_OPERATION" with nobody able to see why.
+// Self-contained: sign in rather than depend on what the previous suite left.
+await signInFresh();
+
+anonymousAllowed = false;
+await page.locator('.topbar button', { hasText: 'Server check' }).click();
+await page.waitForTimeout(900);
+let checkText = await page.locator('.modal__body').innerText();
+ok('it says activation will fail', checkText.indexOf('Activation will fail') > -1, checkText.slice(0, 140));
+ok('it names Anonymous sign-in as the cause', checkText.indexOf('Anonymous sign-in is switched off') > -1);
+ok('it gives the exact path to the setting',
+  checkText.indexOf('Authentication') > -1 && checkText.indexOf('Sign-in method') > -1);
+ok('it says nothing needs rebuilding', checkText.indexOf('rebuilding') > -1);
+ok('it does not echo the raw Firebase code', checkText.indexOf('ADMIN_ONLY_OPERATION') === -1);
+ok('panel access is reported separately, and is fine',
+  checkText.indexOf('Panel access') > -1);
+await page.locator('.modal__foot button', { hasText: 'Close' }).click();
+await page.waitForTimeout(300);
+
+anonymousAllowed = true;
+await page.locator('.topbar button', { hasText: 'Server check' }).click();
+await page.waitForTimeout(900);
+checkText = await page.locator('.modal__body').innerText();
+ok('with the setting on it reports activation works', checkText.indexOf('Activation works') > -1, checkText.slice(0, 140));
+ok('...and says so plainly', checkText.indexOf('Anonymous sign-in is on') > -1);
+await page.locator('.modal__foot button', { hasText: 'Close' }).click();
+await page.waitForTimeout(300);
+
 suite('A broken deploy says so');
 
 // The panel was once deployed with admin-panel/lib/ missing, because those
@@ -447,13 +554,9 @@ await page.route(url => String(url).includes(':runQuery'), route => {
   return route.fulfill({ status: 403, contentType: 'application/json', body: '{}' });
 });
 
-// The previous suite signed out, so sign back in before testing the refusal.
-await page.reload({ waitUntil: 'networkidle' });
-await page.waitForTimeout(500);
-await page.fill('input[type=email]', ADMIN_EMAIL);
-await page.fill('input[type=password]', ADMIN_PASSWORD);
-await page.click('button[type=submit]');
-await page.waitForTimeout(1400);
+// Start from a known state: whatever ran before may or may not have left a
+// session behind, and this suite needs one.
+await signInFresh();
 const denied = await text();
 
 ok('the panel no longer shows a bare "HTTP 403"', denied.indexOf('HTTP 403') === -1, denied.slice(0, 160));

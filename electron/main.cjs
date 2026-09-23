@@ -14,7 +14,7 @@
  *    printing and file dialogs all run here.
  */
 
-const { app, BrowserWindow, Menu, dialog, ipcMain, shell, protocol, net } = require('electron');
+const { app, BrowserWindow, powerMonitor, Menu, dialog, ipcMain, shell, protocol, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
@@ -239,13 +239,70 @@ async function loadLicence() {
   const model = await import(url);
   licence = new LicenceService(app.getPath('userData'), machineId(), machineCode(), model);
 
-  // A quiet re-check in the background, so a revoked or renewed licence is
-  // picked up without anyone having to do anything. Never blocks startup.
-  setTimeout(() => {
-    licence.recheck(false)
-      .then(r => { if (r.changed) send('licence-changed', licence.status()); })
-      .catch(() => {});
-  }, 8000);
+  startLicenceWatch();
+}
+
+/* ------------------------------------------------------- licence watching */
+
+/** How often a running copy asks Firestore whether it is still allowed. */
+const WATCH_INTERVAL_MS = 15 * 60 * 1000;
+/** The first check, far enough in not to slow the window appearing. */
+const WATCH_FIRST_MS = 8000;
+
+let watchTimer = null;
+let lastVerdict = null;
+
+/**
+ * Keeps a running copy honest about its licence.
+ *
+ * The product is offline-first, so there is no socket held open and nothing is
+ * pushed: the app asks. Asking every quarter of an hour, and again whenever
+ * the machine wakes or the network returns, is as close to real time as an
+ * offline product gets — a licence suspended in the panel stops the software
+ * within about fifteen minutes of that computer next having internet, and
+ * immediately on its next start.
+ *
+ * The check is forced rather than left to the daily cadence, because the point
+ * of suspending a licence is that it takes effect without waiting.
+ */
+function startLicenceWatch() {
+  const tick = async () => {
+    if (!licence) return;
+    try {
+      await licence.recheck(true);
+    } catch { /* offline: the cached verdict stands, which is the design */ }
+    announceIfChanged();
+  };
+
+  setTimeout(tick, WATCH_FIRST_MS);
+  if (watchTimer) clearInterval(watchTimer);
+  watchTimer = setInterval(tick, WATCH_INTERVAL_MS);
+  // Nothing here should keep the process alive on its own.
+  if (watchTimer.unref) watchTimer.unref();
+
+  // A laptop that was closed at the hotel desk and opened the next morning has
+  // missed every tick in between; so has one that just regained signal.
+  if (powerMonitor) {
+    powerMonitor.on('resume', () => setTimeout(tick, 4000));
+    powerMonitor.on('unlock-screen', () => setTimeout(tick, 4000));
+  }
+}
+
+/**
+ * Tells the window when the answer changes.
+ *
+ * It compares the verdict the app acts on, not the record: a licence that was
+ * suspended and then resumed before anyone looked produces no record change
+ * worth reporting, but the software must come back to life.
+ */
+function announceIfChanged() {
+  if (!licence) return;
+  const status = licence.status();
+  const verdict = [status.licensed, status.status, status.message].join('|');
+  if (verdict === lastVerdict) return;
+  const first = lastVerdict === null;
+  lastVerdict = verdict;
+  if (!first) send('licence-changed', status);
 }
 
 function registerIpc() {
@@ -260,6 +317,7 @@ function registerIpc() {
 
   ipcMain.handle('licence:recheck', async () => {
     await licence.recheck(true);
+    announceIfChanged();
     return licence.status();
   });
 

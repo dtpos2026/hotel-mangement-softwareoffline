@@ -155,6 +155,12 @@ npm run deploy:panel   # publish the panel and the Firestore rules
 npm run test:panel     # drive the whole panel with Firebase stubbed out
 ```
 
+Licences can be **suspended** (a reversible hold), **revoked** (the end of the
+sale, still reactivatable) or **resumed**. A running copy asks the server every
+fifteen minutes, on every start, and when the machine wakes — so a suspension
+locks the software within about a quarter of an hour, showing the Digital
+Target number and saying plainly that the data is untouched.
+
 `docs/LICENSING.md` has the one-time Firebase setup, how a licence behaves,
 how to move a customer to a new computer, and why the API key in the installer
 is not a secret.
@@ -162,10 +168,10 @@ is not a secret.
 ## Tests
 
 ```bash
-npm test                                  # 740 checks, no browser needed
+npm test                                  # 765 checks, no browser needed
 npx http-server -p 8765 -s . &            # then, for the browser suites:
 node tests/browser.test.mjs               # 133 checks in real Chromium
-npm run test:panel                        # 81 checks, serves itself
+npm run test:panel                        # 104 checks, serves itself
 ```
 
 - `tests/run.js` — the 29-point acceptance checklist against the domain layer.

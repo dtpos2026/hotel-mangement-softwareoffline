@@ -221,4 +221,70 @@ const unknown = await errorFor(500, { error: { message: 'Backend exploded' } });
 ok('anything unrecognised is still reported, with its label',
   unknown && unknown.message.indexOf('Backend exploded') > -1, unknown && unknown.message);
 
+suite('Suspend, revoke and resume');
+
+// A suspension is a reversible hold; a revocation is the end of the sale.
+// Both stop the software, and both say who to ring.
+const suspended = Object.assign(base(), m.lifecyclePatch('suspended', 'owner@dt.pk'));
+const vSusp = m.evaluateRecord(suspended, THIS_PC);
+eq('a suspended licence is refused', vSusp.status, m.STATUS.SUSPENDED);
+ok('...and says so as inactive, not as an error code',
+  /License inactive/.test(vSusp.message), vSusp.message);
+ok('...and gives the support number', /\+92 345 1873354/.test(vSusp.message), vSusp.message);
+ok('...and names the company', /Digital Target/.test(vSusp.message));
+
+const revoked2 = Object.assign(base(), m.lifecyclePatch('revoked', 'owner@dt.pk'));
+eq('a revoked licence is refused', m.evaluateRecord(revoked2, THIS_PC).status, m.STATUS.REVOKED);
+ok('...with the same contact line', /1873354/.test(m.evaluateRecord(revoked2, THIS_PC).message));
+
+const resumed = Object.assign(base(), m.lifecyclePatch('active', 'owner@dt.pk'));
+ok('resuming lets the software run again', m.evaluateRecord(resumed, THIS_PC).ok === true);
+eq('...and clears the old boolean', resumed.revoked, false);
+
+eq('a suspension writes the old boolean too, so older builds stop',
+  m.lifecyclePatch('suspended').revoked, true);
+eq('a revocation writes it as well', m.lifecyclePatch('revoked').revoked, true);
+ok('a lifecycle change records who made it',
+  m.lifecyclePatch('suspended', 'me@dt.pk').lifecycleChangedBy === 'me@dt.pk');
+ok('...and when', String(m.lifecyclePatch('suspended').lifecycleChangedAt).length > 10);
+eq('an unknown lifecycle falls back to active rather than locking everyone out',
+  m.lifecyclePatch('nonsense').lifecycle, 'active');
+
+suite('Records written before suspension existed');
+
+// These are already in Firestore. They carry only the boolean.
+const legacyActive = Object.assign(base(), { revoked: false });
+delete legacyActive.lifecycle;
+ok('an old live record still runs', m.evaluateRecord(legacyActive, THIS_PC).ok === true);
+eq('...and reads as active', m.lifecycleOf(legacyActive), 'active');
+
+const legacyRevoked = Object.assign(base(), { revoked: true });
+delete legacyRevoked.lifecycle;
+eq('an old revoked record still reads as revoked', m.lifecycleOf(legacyRevoked), 'revoked');
+ok('...and is still refused', m.evaluateRecord(legacyRevoked, THIS_PC).ok === false);
+
+eq('a record with neither field is treated as active', m.lifecycleOf({}), 'active');
+eq('no record at all is not an excuse to run', m.evaluateRecord(null, THIS_PC).ok, false);
+
+// The two fields can only disagree through an old tool or a hand edit. A
+// licence gate that has to guess should guess towards stopping.
+const disagreeing = Object.assign(base(), { lifecycle: 'active', revoked: true });
+eq('when the fields disagree the stricter one wins', m.lifecycleOf(disagreeing), 'revoked');
+ok('...so the software stops', m.evaluateRecord(disagreeing, THIS_PC).ok === false);
+
+const alsoDisagreeing = Object.assign(base(), { lifecycle: 'suspended', revoked: false });
+eq('a named hold beats a stale boolean too', m.lifecycleOf(alsoDisagreeing), 'suspended');
+
+suite('Lifecycle and expiry together');
+
+// What the vendor decided is the conversation to have, even when the licence
+// has also run out.
+const suspendedAndExpired = Object.assign(base(), m.lifecyclePatch('suspended'), { expiresAt: '2020-01-01' });
+eq('a suspended licence that also expired reports the suspension',
+  m.evaluateRecord(suspendedAndExpired, THIS_PC).status, m.STATUS.SUSPENDED);
+
+const describedSusp = m.describeRecord(suspended);
+eq('the licence screen can name the lifecycle', describedSusp.lifecycle, 'suspended');
+eq('...in words', describedSusp.lifecycleLabel, 'Suspended');
+
 process.exit(report() === 0 ? 0 : 1);

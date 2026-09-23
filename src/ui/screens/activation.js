@@ -11,7 +11,8 @@ import { h, mount, qs, busy } from '../dom.js';
 import { card, alert, railRows, badge } from '../components.js';
 import { toast, ok as toastOk, fail, confirm } from '../feedback.js';
 import * as host from '../../core/host.js';
-import { formatKey, normaliseKey, isWellFormed, KEY_GROUPS, KEY_GROUP_LEN } from '../../core/licence-model.js';
+import { formatKey, normaliseKey, isWellFormed, KEY_GROUPS, KEY_GROUP_LEN,
+         SUPPORT_CONTACT as SUPPORT } from '../../core/licence-model.js';
 
 const KEY_CHARS = KEY_GROUPS * KEY_GROUP_LEN;
 
@@ -169,7 +170,9 @@ export function activationCard(status, onActivated, opts) {
       h('button.btn.btn--primary.btn--lg', { type: 'button', 'data-activate': '1', text: 'Activate', onclick: activate })
     ]) : null,
 
-    !status.licensed ? alert('info', 'Internet is needed once',
+    needsVendor(status) ? supportCard() : null,
+
+    !status.licensed && !needsVendor(status) ? alert('info', 'Internet is needed once',
       'Activation checks your key with the licence server. After that the software runs completely offline — no connection is needed for day-to-day work.') : null,
 
     status.licensed && host.isDesktop ? h('div.row', [
@@ -200,11 +203,52 @@ export function activationCard(status, onActivated, opts) {
   ]));
 }
 
+/** True when nothing the person at the desk can do will fix this. */
+function needsVendor(status) {
+  return ['suspended', 'revoked', 'expired', 'wrong_machine'].indexOf(status.status) > -1;
+}
+
+/**
+ * Who to ring, on the screen that stops them working.
+ *
+ * A suspended licence is a conversation between the owner and Digital Target,
+ * but the person reading this is usually a receptionist with a guest at the
+ * desk. Giving them the number, tappable, is the whole job of this card — and
+ * it says plainly that the data is safe, because that is the first thing
+ * anybody fears when a screen locks.
+ */
+function supportCard() {
+  const rows = SUPPORT.whatsapp.map(n => h('a.btn.btn--block', {
+    href: 'https://wa.me/' + n.replace(/\D/g, ''),
+    target: '_blank', rel: 'noopener',
+    style: { justifyContent: 'space-between' }
+  }, [
+    h('span', { text: 'WhatsApp ' + n }),
+    h('span.text-xs.text-muted', { text: 'opens WhatsApp' })
+  ]));
+
+  return card({ title: 'Contact ' + SUPPORT.company }, h('div.stack.stack--sm', [
+    h('div', {
+      style: {
+        fontFamily: 'var(--font-mono)', fontSize: '17px', fontWeight: '700',
+        color: 'var(--accent)', letterSpacing: '0.01em'
+      },
+      text: SUPPORT.phone
+    }),
+    h('div.text-sm.text-muted', {
+      text: 'Your bookings, guests and payments are all still on this computer and are not affected. Everything comes back as soon as the licence is active again.'
+    }),
+    ...rows,
+    h('a.btn.btn--block', { href: 'mailto:' + SUPPORT.email, text: SUPPORT.email })
+  ]));
+}
+
 function statusLabel(status) {
   switch (status.status) {
     case 'active': return 'Licensed';
     case 'expired': return 'Expired';
-    case 'revoked': return 'Withdrawn';
+    case 'suspended': return 'Suspended';
+    case 'revoked': return 'Inactive';
     case 'wrong_machine': return 'Another computer';
     case 'not_found': return 'Unknown key';
     case 'tampered': return 'Re-activation needed';
@@ -220,7 +264,8 @@ function headline(status) {
   if (status.licensed) return 'This copy is licensed';
   switch (status.status) {
     case 'expired': return 'Your licence has expired';
-    case 'revoked': return 'This licence has been withdrawn';
+    case 'suspended': return 'This licence is on hold';
+    case 'revoked': return 'This licence is no longer active';
     case 'wrong_machine': return 'This licence is in use on another computer';
     case 'not_found': return 'That key was not recognised';
     case 'tampered': return 'Please activate again';

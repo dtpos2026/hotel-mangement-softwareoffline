@@ -102,6 +102,7 @@ export function keyToDocId(input) { return normaliseKey(input); }
 export const STATUS = {
   ACTIVE: 'active',
   NOT_FOUND: 'not_found',
+  SUSPENDED: 'suspended',
   REVOKED: 'revoked',
   EXPIRED: 'expired',
   WRONG_MACHINE: 'wrong_machine',
@@ -109,6 +110,79 @@ export const STATUS = {
   OFFLINE: 'offline',
   NONE: 'none'
 };
+
+/** Who to call when a licence stops working. */
+export const SUPPORT_CONTACT = {
+  company: 'Digital Target',
+  phone: '+92 345 1873354',
+  whatsapp: ['+92 345 1873354', '+92 332 2373354'],
+  email: 'digitaltarget.digital@gmail.com',
+  facebook: 'https://web.facebook.com/digitaltargetpk/',
+  instagram: 'https://www.instagram.com/digitaltarget_pk'
+};
+
+export function supportLine() {
+  return `${SUPPORT_CONTACT.company}: ${SUPPORT_CONTACT.phone}`;
+}
+
+/* ------------------------------------------------------------- lifecycle */
+
+/**
+ * What the vendor has decided about a licence, independent of whether it has
+ * expired or which computer holds it.
+ *
+ *   active     sold and running
+ *   suspended  temporarily stopped — unpaid instalment, a dispute. Reversible,
+ *              and the customer's data is untouched; they get it back the
+ *              moment it is resumed.
+ *   revoked    finished for good — refunded, charged back, replaced.
+ *
+ * Suspension exists because "revoke" was doing two jobs that call for
+ * different conversations with a customer.
+ */
+export const LIFECYCLES = [
+  { key: 'active',    label: 'Active',    tone: 'ok' },
+  { key: 'suspended', label: 'Suspended', tone: 'warn' },
+  { key: 'revoked',   label: 'Revoked',   tone: 'bad' }
+];
+
+/**
+ * Reads a record's lifecycle, tolerating the older shape.
+ *
+ * Records written before suspension existed carry only `revoked: true|false`.
+ * They are still in Firestore and must keep working exactly as they did, so
+ * the boolean is honoured whenever the newer field is absent.
+ */
+export function lifecycleOf(record) {
+  if (!record) return 'active';
+  const named = String(record.lifecycle || '').toLowerCase();
+  const known = LIFECYCLES.some(l => l.key === named);
+
+  // The two fields are written together and should always agree. When they do
+  // not — an older tool that knows only the boolean, a hand edit in the
+  // console — the stricter one wins. A licence gate that guesses should guess
+  // towards stopping, not towards running.
+  if (known && named !== 'active') return named;
+  if (record.revoked) return known && named !== 'active' ? named : 'revoked';
+  return known ? named : 'active';
+}
+
+/**
+ * The fields to write for a lifecycle change.
+ *
+ * Both the new field and the old boolean are written, so a copy of the
+ * software built before suspension existed still stops on a revoke, and a
+ * suspension reads as revoked to it rather than being silently ignored.
+ */
+export function lifecyclePatch(lifecycle, by) {
+  const key = LIFECYCLES.some(l => l.key === lifecycle) ? lifecycle : 'active';
+  return {
+    lifecycle: key,
+    revoked: key !== 'active',
+    lifecycleChangedAt: new Date().toISOString(),
+    lifecycleChangedBy: String(by || '')
+  };
+}
 
 export function todayStr() {
   const d = new Date();
@@ -138,9 +212,14 @@ export function evaluateRecord(record, machineId) {
     return { ok: false, status: STATUS.NOT_FOUND,
       message: 'That licence key was not found. Check it was typed exactly as supplied.' };
   }
-  if (record.revoked) {
-    return { ok: false, status: STATUS.REVOKED,
-      message: 'This licence has been withdrawn. Please contact your supplier.' };
+  const lifecycle = lifecycleOf(record);
+  if (lifecycle === 'suspended') {
+    return { ok: false, status: STATUS.SUSPENDED, lifecycle,
+      message: `License inactive. Please contact ${supportLine()}` };
+  }
+  if (lifecycle === 'revoked') {
+    return { ok: false, status: STATUS.REVOKED, lifecycle,
+      message: `License inactive. Please contact ${supportLine()}` };
   }
   if (record.expiresAt) {
     const left = daysUntil(record.expiresAt);
@@ -158,6 +237,7 @@ export function evaluateRecord(record, machineId) {
   return {
     ok: true,
     status: STATUS.ACTIVE,
+    lifecycle,
     daysLeft: left,
     expiringSoon: left !== null && left <= 14,
     firstActivation: !record.machineId,
@@ -189,7 +269,10 @@ export function describeRecord(record) {
     featureLabels: (Array.isArray(record.features) ? record.features : (PLAN_FEATURES[plan.key] || []))
       .map(k => (FEATURES.find(f => f.key === k) || {}).label || k),
     activatedAt: record.activatedAt || '',
-    machineId: record.machineId || ''
+    machineId: record.machineId || '',
+    lifecycle: lifecycleOf(record),
+    lifecycleLabel: (LIFECYCLES.find(l => l.key === lifecycleOf(record)) || LIFECYCLES[0]).label,
+    lifecycleChangedAt: record.lifecycleChangedAt || ''
   };
 }
 
@@ -199,7 +282,9 @@ export function blankRecord() {
     key: '', businessName: '', ownerName: '', phone: '', email: '', city: '',
     plan: 'standard', issuedAt: '', expiresAt: '',
     maxUnits: 25, maxUsers: 5, features: PLAN_FEATURES.standard.slice(),
-    notes: '', revoked: false, machineId: '', machineCode: '', activatedAt: '',
+    notes: '', lifecycle: 'active', revoked: false,
+    lifecycleChangedAt: '', lifecycleChangedBy: '',
+    machineId: '', machineCode: '', activatedAt: '',
     lastSeenAt: '', issuedBy: ''
   };
 }

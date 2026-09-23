@@ -39,10 +39,31 @@ Open the licence, then **Release the computer**. The binding is cleared and the
 next computer to enter the key claims it. Do this when a customer replaces a PC
 — otherwise they will be told the licence is already in use elsewhere.
 
-### Revoke or delete?
+### Suspend, revoke or delete?
 
-**Revoke.** A revoked licence can be restored, and the record stays searchable
-when the customer phones a year later. Delete only removes your own history.
+**Suspend** is the reversible hold — an unpaid instalment, a dispute. The
+software locks with the Digital Target number on screen; nothing is deleted and
+the customer gets everything back the moment you press Resume.
+
+**Revoke** is the end of the sale — refunded, charged back, replaced. It can
+still be reactivated if the customer comes back, and the record stays
+searchable when they phone a year later.
+
+**Delete** only removes your own history. Prefer the other two.
+
+### How quickly does a change take effect?
+
+The software is offline-first, so nothing is pushed to it. A running copy asks
+the licence server every fifteen minutes, on every start, and again when the
+computer wakes or the screen unlocks. So a suspension takes effect:
+
+- **immediately** on the next start, and
+- **within about fifteen minutes** on a copy that is already running and has
+  internet.
+
+A copy with no internet keeps working on its cached answer, which is the whole
+point of the product; it stops the moment it next reaches the internet, and in
+any case after 45 days without a check.
 
 ---
 
@@ -112,6 +133,15 @@ npm run deploy:rules
 ```
 
 ---
+
+## Checking the project before you sell
+
+The panel signing in says nothing about whether a customer's software will:
+the panel uses a password, the software signs in anonymously, and those are two
+separate switches. **Server check** in the panel closes that gap — it does the
+same anonymous sign-in a customer's copy does and reports whether activation
+will work, so a missing setting is found in the panel rather than on somebody
+else's PC.
 
 ## Running the panel locally
 

@@ -104,7 +104,38 @@ async function boot() {
     toast('warn', 'Licence expiring soon', licence.message, 12000);
   }
 
+  watchLicence(app);
+
   if (store.db.all('units').length === 0) firstRun(store, app);
+}
+
+/**
+ * Locks the running app when the vendor suspends or revokes its licence.
+ *
+ * The desktop shell re-checks with the licence server in the background and
+ * tells the window when the answer changes. A suspension is meant to take
+ * effect without waiting for a restart, so this draws the lock over whatever
+ * is on screen — but it lets the current keystroke finish and says plainly who
+ * to ring, because the person in front of it is a receptionist with a guest at
+ * the desk, not the customer who owes the money.
+ *
+ * Nothing is deleted. The data stays exactly where it is and comes back the
+ * moment the licence is resumed.
+ */
+function watchLicence(app) {
+  host.onLicenceChanged(status => {
+    host.setLicence(status);
+
+    if (status.ok) {
+      // Back in good standing — pick the change up without losing the screen.
+      toast('ok', 'Licence updated', status.message, 8000);
+      app.refresh();
+      return;
+    }
+
+    const root = qs('#root');
+    activationGate(root, status, () => window.location.reload());
+  });
 }
 
 /** Native menu items map onto the same navigation the sidebar uses. */

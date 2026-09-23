@@ -7,12 +7,47 @@
  * offline for good.
  */
 
-import { h, clear } from '../lib/dom.js';
+import { h, clear, mount } from '../lib/dom.js';
 import * as model from '../lib/licence-model.js';
 import config from '../lib/firebase-config.js';
 import { Panel } from './firebase.js';
 
 const panel = new Panel(config);
+
+/* ---------------------------------------------------------------- brand */
+
+const BRAND = {
+  company: 'Digital Target',
+  product: 'Hotel Register',
+  whatsapp: ['+92 345 1873354', '+92 332 2373354'],
+  email: 'digitaltarget.digital@gmail.com',
+  facebook: 'https://web.facebook.com/digitaltargetpk/',
+  instagram: 'https://www.instagram.com/digitaltarget_pk'
+};
+
+/** The mark, inline so it needs no request and inherits the colour around it. */
+function brandMark(size) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('width', String(size || 26));
+  svg.setAttribute('height', String(size || 26));
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML =
+    '<g fill="currentColor">' +
+    '<path d="M1 1 H48 L1 48 Z"/><path d="M52 1 H99 L52 48 Z"/>' +
+    '<path d="M1 52 H48 L1 99 Z"/><path d="M52 52 H99 L52 99 Z"/></g>';
+  return svg;
+}
+
+function brandLockup(size) {
+  return h('div.lockup', [
+    h('div.lockup__mark', brandMark(size || 26)),
+    h('div.lockup__words', [
+      h('strong.lockup__company', { text: BRAND.company }),
+      h('span.lockup__product', { text: BRAND.product + ' · Licences' })
+    ])
+  ]);
+}
 
 const state = {
   screen: 'signin',
@@ -63,9 +98,17 @@ async function copy(text, what) {
   }
 }
 
-/** What a licence is doing right now, in one word. */
+/**
+ * What a licence is doing right now, in one word.
+ *
+ * What the vendor decided comes first: a suspended licence is suspended
+ * whether or not it has also expired, because that is the conversation to
+ * have with the customer.
+ */
 function statusOf(rec) {
-  if (rec.revoked) return 'revoked';
+  const life = model.lifecycleOf(rec);
+  if (life === 'revoked') return 'revoked';
+  if (life === 'suspended') return 'suspended';
   if (rec.expiresAt && model.daysUntil(rec.expiresAt) < 0) return 'expired';
   if (!rec.machineId) return 'unused';
   if (rec.expiresAt && model.daysUntil(rec.expiresAt) <= 14) return 'expiring';
@@ -74,7 +117,7 @@ function statusOf(rec) {
 
 const STATUS_LABEL = {
   active: 'Active', expiring: 'Expiring', expired: 'Expired',
-  revoked: 'Revoked', unused: 'Not activated'
+  suspended: 'Suspended', revoked: 'Revoked', unused: 'Not activated'
 };
 
 /* ------------------------------------------------------------------ boot */
@@ -147,10 +190,10 @@ function signInScreen() {
   return h('div.signin', [
     h('div.signin__card', [
       h('div.signin__brand', [
-        h('div.brand-mark', { text: 'DT' }),
+        h('div.brand-mark', brandMark(24)),
         h('div', [
           h('h1.signin__title', { text: 'Licence Panel' }),
-          h('p.signin__sub', { text: 'Digital Target · Hotel Register' })
+          h('p.signin__sub', { text: BRAND.company + ' · ' + BRAND.product })
         ])
       ]),
       form,
@@ -188,7 +231,27 @@ function panelScreen() {
       toolbar(),
       state.loading ? h('div.empty', { text: 'Loading licences…' }) : licenceTable()
     ]),
-    state.selected ? detailDrawer(state.selected) : null
+    state.selected ? detailDrawer(state.selected) : null,
+    brandFooter()
+  ]);
+}
+
+function brandFooter() {
+  return h('footer.foot', [
+    h('div.foot__brand', [
+      h('span.foot__mark', brandMark(18)),
+      h('span', { text: BRAND.company })
+    ]),
+    h('div.foot__links', [
+      ...BRAND.whatsapp.map(n => h('a.foot__link', {
+        href: 'https://wa.me/' + n.replace(/\D/g, ''), target: '_blank', rel: 'noopener',
+        text: n
+      })),
+      h('a.foot__link', { href: 'mailto:' + BRAND.email, text: BRAND.email }),
+      h('a.foot__link', { href: BRAND.facebook, target: '_blank', rel: 'noopener', text: 'Facebook' }),
+      h('a.foot__link', { href: BRAND.instagram, target: '_blank', rel: 'noopener', text: 'Instagram' })
+    ]),
+    h('span.foot__project', { text: config.projectId })
   ]);
 }
 
@@ -241,16 +304,17 @@ function adminSetupHelp() {
 function topbar() {
   return h('header.topbar', [
     h('div.topbar__brand', [
-      h('div.brand-mark', { text: 'DT' }),
+      h('div.brand-mark', brandMark(22)),
       h('div', [
-        h('strong.topbar__title', { text: 'Licence Panel' }),
-        h('span.topbar__sub', { text: config.projectId })
+        h('strong.topbar__title', { text: BRAND.company }),
+        h('span.topbar__sub', { text: BRAND.product + ' · licences' })
       ])
     ]),
     h('div.topbar__right', [
       h('button.btn.btn--primary', { type: 'button', text: '+ New licence', onclick: () => newLicenceDialog() }),
       h('button.btn', { type: 'button', text: 'Refresh',
         onclick: async () => { await loadLicences(); render(); } }),
+      h('button.btn', { type: 'button', text: 'Server check', onclick: () => serverCheckDialog() }),
       h('div.who', [
         h('span.who__mail', { text: panel.email }),
         h('button.linky', { type: 'button', text: 'Change password', onclick: () => changePasswordDialog() }),
@@ -262,7 +326,7 @@ function topbar() {
 }
 
 function statsRow() {
-  const by = { active: 0, expiring: 0, expired: 0, revoked: 0, unused: 0 };
+  const by = { active: 0, expiring: 0, expired: 0, suspended: 0, revoked: 0, unused: 0 };
   state.licences.forEach(r => { by[statusOf(r)]++; });
   const cards = [
     { key: 'all', label: 'All licences', value: state.licences.length, tone: 'ink' },
@@ -270,6 +334,7 @@ function statsRow() {
     { key: 'expiring', label: 'Expiring soon', value: by.expiring, tone: 'warn' },
     { key: 'expired', label: 'Expired', value: by.expired, tone: 'bad' },
     { key: 'unused', label: 'Not activated', value: by.unused, tone: 'muted' },
+    { key: 'suspended', label: 'Suspended', value: by.suspended, tone: 'warn' },
     { key: 'revoked', label: 'Revoked', value: by.revoked, tone: 'bad' }
   ];
   return h('div.stats', cards.map(c =>
@@ -360,6 +425,7 @@ function licenceTable() {
 function detailDrawer(rec) {
   const d = model.describeRecord(rec);
   const status = statusOf(rec);
+  const life = model.lifecycleOf(rec);
   const close = () => { state.selected = null; render(); };
 
   const row = (label, value, extra) => h('div.kv', [
@@ -376,6 +442,14 @@ function detailDrawer(rec) {
   };
 
   const keyText = model.formatKey(rec.docId || rec.key || '');
+
+  /**
+   * Writes a lifecycle change. lifecyclePatch() writes the old boolean
+   * alongside the new field, so a copy of the software built before
+   * suspension existed still stops rather than ignoring it.
+   */
+  const setLifecycle = (record, to, said) => act(said, () => panel.patchDoc(
+    config.licencesCollection, record.docId, model.lifecyclePatch(to, panel.email)));
 
   return h('div.drawer-wrap', [
     h('div.drawer__scrim', { onclick: close }),
@@ -434,6 +508,11 @@ function detailDrawer(rec) {
           : h('p.note', { text: 'Not activated yet. The first computer to enter this key will claim it.' })
       ]),
 
+      h('section.drawer__section', [
+        h('h3.drawer__h', { text: 'Activity' }),
+        activityList(rec)
+      ]),
+
       rec.notes ? h('section.drawer__section', [
         h('h3.drawer__h', { text: 'Notes' }),
         h('p.note', { text: rec.notes })
@@ -442,12 +521,22 @@ function detailDrawer(rec) {
       h('div.drawer__acts', [
         h('button.btn', { type: 'button', text: 'Edit details', onclick: () => editLicenceDialog(rec) }),
         h('button.btn', { type: 'button', text: 'Renew / extend', onclick: () => renewDialog(rec) }),
-        rec.revoked
-          ? h('button.btn', { type: 'button', text: 'Restore licence', onclick: () =>
-              act('Restored', () => panel.patchDoc(config.licencesCollection, rec.docId, { revoked: false })) })
-          : h('button.btn.btn--danger-soft', { type: 'button', text: 'Revoke', onclick: () =>
-              confirmThen('Revoke this licence? The software will stop working the next time it reaches the internet.',
-                () => act('Revoked', () => panel.patchDoc(config.licencesCollection, rec.docId, { revoked: true }))) }),
+
+        // Suspending and revoking are different conversations with a customer,
+        // so they are different buttons. Both reach the software within about
+        // fifteen minutes of that computer next having internet.
+        life === 'active'
+          ? h('button.btn.btn--warn-soft', { type: 'button', text: 'Suspend', onclick: () =>
+              confirmThen('Suspend this licence? The software locks until you resume it. Nothing is deleted — the customer gets everything back the moment it is resumed.',
+                () => setLifecycle(rec, 'suspended', 'Suspended')) })
+          : h('button.btn.btn--ok-soft', { type: 'button', text: life === 'revoked' ? 'Reactivate' : 'Resume', onclick: () =>
+              setLifecycle(rec, 'active', life === 'revoked' ? 'Reactivated' : 'Resumed') }),
+
+        life !== 'revoked'
+          ? h('button.btn.btn--danger-soft', { type: 'button', text: 'Revoke', onclick: () =>
+              confirmThen('Revoke this licence for good? Use Suspend instead if the customer may come back — a revoked licence can be reactivated, but revoking is the end of the sale.',
+                () => setLifecycle(rec, 'revoked', 'Revoked')) })
+          : null,
         h('button.btn.btn--danger', { type: 'button', text: 'Delete', onclick: () =>
           confirmThen('Delete this licence for good? Revoking is usually the right choice — a deleted record cannot be looked up later.',
             async () => {
@@ -458,6 +547,56 @@ function detailDrawer(rec) {
       ])
     ])
   ]);
+}
+
+/**
+ * What has happened to this licence, newest first.
+ *
+ * Built from the timestamps already on the record rather than a separate log:
+ * a second collection of events would be one more thing to keep in step, and
+ * these four dates answer the questions a vendor actually asks — when did I
+ * sell it, when did they install it, is it still running, and when did I last
+ * change my mind about it.
+ */
+function activityList(rec) {
+  const life = model.lifecycleOf(rec);
+  const events = [
+    rec.issuedAt && { at: rec.issuedAt, tone: 'ok',
+      what: 'Issued', who: rec.issuedBy || '' },
+    rec.activatedAt && { at: rec.activatedAt, tone: 'ok',
+      what: 'Activated on ' + (rec.machineCode || 'a computer'), who: '' },
+    rec.lifecycleChangedAt && { at: rec.lifecycleChangedAt,
+      tone: life === 'active' ? 'ok' : life === 'suspended' ? 'warn' : 'bad',
+      what: life === 'active' ? 'Resumed' : life === 'suspended' ? 'Suspended' : 'Revoked',
+      who: rec.lifecycleChangedBy || '' },
+    rec.lastSeenAt && { at: rec.lastSeenAt, tone: 'muted',
+      what: 'Last checked in', who: '' }
+  ].filter(Boolean).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+
+  if (!events.length) return h('p.note', { text: 'Nothing has happened to this licence yet.' });
+
+  return h('ol.activity', events.map(e => h('li.activity__row', { 'data-tone': e.tone }, [
+    h('span.activity__dot'),
+    h('span.activity__what', [
+      h('span', { text: e.what }),
+      e.who ? h('span.activity__who', { text: e.who }) : null
+    ]),
+    h('time.activity__when', { text: whenText(e.at) })
+  ])));
+}
+
+/** "2 hours ago" is more use than a timestamp for anything recent. */
+function whenText(iso) {
+  const then = new Date(iso);
+  if (isNaN(then)) return shortDate(iso);
+  const mins = Math.round((Date.now() - then.getTime()) / 60000);
+  if (mins < 2) return 'just now';
+  if (mins < 60) return mins + ' min ago';
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
+  const days = Math.round(hours / 24);
+  if (days <= 30) return days + (days === 1 ? ' day ago' : ' days ago');
+  return shortDate(iso);
 }
 
 function daysNote(expiresAt) {
@@ -732,6 +871,46 @@ function addDaysTo(dateStr, days) {
   const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
   d.setDate(d.getDate() + Number(days || 0));
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Checks the project is set up so customers can actually activate.
+ *
+ * The panel working says nothing about whether the software will: the panel
+ * signs in with a password, the software signs in anonymously, and those are
+ * separate switches. This closes that gap without anyone having to install a
+ * copy to find out.
+ */
+function serverCheckDialog() {
+  // The panel's modal() takes (title, body, footer) positionally — it is not
+  // the app's object-shaped one.
+  const body = h('div.stack', [h('p.note', { text: 'Checking…' })]);
+  const wrap = modal('Licence server check', body, [
+    h('button.btn.btn--primary', { type: 'button', text: 'Close', onclick: () => wrap.remove() })
+  ]);
+
+  panel.checkActivationWorks().then(result => {
+    mount(body, h('div.stack', [
+      h('div.check' + (result.ok ? '.check--ok' : '.check--bad'), [
+        h('span.check__mark', { text: result.ok ? '✓' : '✕' }),
+        h('div', [
+          h('strong', { text: result.ok ? 'Activation works' : 'Activation will fail' }),
+          h('p.note', { text: result.message })
+        ])
+      ]),
+      result.fix ? h('div.setup__value', [h('code', { text: result.fix })]) : null,
+      result.fixable ? h('p.note', {
+        text: 'Nothing needs rebuilding or reinstalling. Turn the setting on and the next Activate press on the customer\'s computer works.'
+      }) : null,
+      h('div.check.check--ok', [
+        h('span.check__mark', { text: '✓' }),
+        h('div', [
+          h('strong', { text: 'Panel access' }),
+          h('p.note', { text: 'Signed in as ' + panel.email + ', and Firestore is answering.' })
+        ])
+      ])
+    ]));
+  });
 }
 
 function changePasswordDialog() {
