@@ -45,6 +45,8 @@ export class App {
     this.screens = screens;          // id -> render(ctx)
     this.screen = 'dashboard';
     this.params = {};
+    this.locked = false;
+    this.clockTimer = null;
     this.searchTerm = '';
     this.searchResults = [];
     this.searchIndex = -1;
@@ -54,6 +56,7 @@ export class App {
   /* --- navigation -------------------------------------------------------- */
 
   go(screen, params) {
+    if (this.locked) return;
     const spec = SCREENS.find(s => s.id === screen);
     if (spec && spec.perm && !this.store.session.can(spec.perm)) {
       toast('warn', t('msg.noPermission'), `"${spec.label}" is not available to your role.`);
@@ -71,6 +74,7 @@ export class App {
 
   /** Re-renders the current screen in place, keeping scroll position. */
   refresh() {
+    if (this.locked) return;
     const main = qs('.main');
     const y = main ? main.scrollTop : window.scrollY;
     this.render();
@@ -117,7 +121,24 @@ export class App {
 
   /* --- rendering --------------------------------------------------------- */
 
+  /**
+   * Stops the shell drawing itself, for good.
+   *
+   * When a licence is suspended or revoked mid-shift the window draws a lock
+   * over everything — but the app is alive underneath, and any refresh from a
+   * toast, a timer or a background save would paint the sidebar straight back
+   * over the lock and hand the software to someone who is not licensed for
+   * it. Locking has to survive that, so it is a one-way switch rather than a
+   * screen.
+   */
+  lock() {
+    this.locked = true;
+    closeAllModals();
+    if (this.clockTimer) { clearInterval(this.clockTimer); this.clockTimer = null; }
+  }
+
   render() {
+    if (this.locked) return;
     const store = this.store;
     document.documentElement.setAttribute('dir', dir());
     document.documentElement.setAttribute('lang', getLanguage());
@@ -420,8 +441,9 @@ export class App {
     this.render();
 
     // The clock is the only thing that ticks; repainting the whole shell every
-    // second would fight with open menus and focused inputs.
-    setInterval(() => {
+    // second would fight with open menus and focused inputs. Held so locking
+    // can stop it.
+    this.clockTimer = setInterval(() => {
       const el = qs('#clock');
       if (el) el.textContent = `${formatDateLong(today())} · ${formatTime(nowIso())}`;
     }, 10000);

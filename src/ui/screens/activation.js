@@ -134,8 +134,32 @@ export function activationCard(status, onActivated, opts) {
 
   const d = status.details;
 
+  // "Already has a key" means this copy was activated at some point, so its
+  // licence exists and the problem is upstream rather than mistyped.
+  const alreadyHasKey = !!(d && d.key);
+
+  /** The key box and its Activate button, as one block that can be swapped in. */
+  function keyEntry() {
+    return h('div.stack.stack--sm', [
+      h('div.field', [
+        h('label.field__label', { text: 'Licence key' }),
+        keyInput,
+        helpRow
+      ]),
+      machineRow,
+      h('div.row', [
+        h('button.btn.btn--primary.btn--lg', {
+          type: 'button', 'data-activate': '1', text: 'Activate', onclick: activate })
+      ])
+    ]);
+  }
+
   return card({
-    title: status.licensed ? 'Licence' : 'Activate your software',
+    // "Activate your software" is wrong for a copy that is already activated
+    // and has simply been stopped: it implies a step the customer can take.
+    title: status.licensed ? 'Licence'
+      : alreadyHasKey ? 'Your licence'
+      : 'Activate your software',
     tools: [badge(statusLabel(status), tone)]
   }, h('div.stack', [
     alert(tone, headline(status), status.message),
@@ -158,17 +182,33 @@ export function activationCard(status, onActivated, opts) {
       h('div.row.row--tight', { style: { marginTop: '6px' } }, d.featureLabels.map(f => badge(f, 'muted')))
     ]) : null,
 
-    !status.licensed ? h('div.field', [
-      h('label.field__label', { text: 'Licence key' }),
-      keyInput,
-      helpRow
+    // A copy that already holds a key does not need to be asked for one
+    // again: what it needs is to look again, once the vendor has acted.
+    // Offering an empty box here reads as "you typed it wrong", which is the
+    // one thing that did not happen.
+    !status.licensed && alreadyHasKey ? h('div.stack.stack--sm', [
+      h('div.text-sm.text-muted', {
+        text: 'Once ' + SUPPORT.company + ' has sorted this out, press the button below — there is no need to type the key again.'
+      }),
+      h('div.row', [
+        host.isDesktop ? h('button.btn.btn--primary.btn--lg', {
+          type: 'button', text: 'Check again now',
+          onclick: e => busy(e.currentTarget, async () => {
+            const next = await host.recheckLicence();
+            if (next.licensed) {
+              toastOk('Licence active again', next.message);
+              if (onActivated) onActivated(next);
+            } else {
+              toast('warn', 'Still inactive', next.message);
+            }
+          })
+        }) : null,
+        h('button.btn', { type: 'button', text: 'Enter a different key',
+          onclick: (e) => { e.currentTarget.closest('.stack').replaceWith(keyEntry()); } })
+      ])
     ]) : null,
 
-    !status.licensed ? machineRow : null,
-
-    !status.licensed ? h('div.row', [
-      h('button.btn.btn--primary.btn--lg', { type: 'button', 'data-activate': '1', text: 'Activate', onclick: activate })
-    ]) : null,
+    !status.licensed && !alreadyHasKey ? keyEntry() : null,
 
     needsVendor(status) ? supportCard() : null,
 

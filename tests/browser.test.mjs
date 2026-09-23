@@ -769,6 +769,134 @@ ok('the domain refuses a settings change for reception', blocked.refused && bloc
 
 /* -------------------------------------------------------------- summary */
 
+/* ------------------------------------------------- the lock, end to end */
+
+suite('A suspended licence locks the running app');
+
+// The chain this has to prove: a licence is suspended in the panel, the
+// desktop shell notices on its next check and tells the window, and the
+// window locks with something a receptionist can act on. The shell's half is
+// covered by the desktop suite; this is the window's half, driven through the
+// same function the shell's event calls.
+const lockState = await page.evaluate(async () => {
+  const { activationGate } = await import('/src/ui/screens/activation.js');
+  const { supportLine, SUPPORT_CONTACT } = await import('/src/core/licence-model.js');
+
+  // Exactly what the shell's licence-changed handler does.
+  window.__hms.app.lock();
+
+  // A suspended copy was activated at some point, so it holds a cached
+  // record — that is what makes it suspended rather than unactivated.
+  activationGate(document.querySelector('#root'), {
+    ok: false, licensed: false, status: 'suspended',
+    message: 'License inactive. Please contact ' + supportLine(),
+    details: { key: 'HR-4F2K-9XQP-7M3A', businessName: 'Kalam Continental',
+               plan: 'Standard', expires: '2027-01-10', units: '25', users: '5',
+               featureLabels: [], activatedAt: '2026-01-11' }
+  }, () => {});
+
+  return {
+    text: document.body.innerText,
+    sidebars: document.querySelectorAll('.sidebar').length,
+    waLinks: Array.from(document.querySelectorAll('a[href^="https://wa.me/"]')).map(a => a.getAttribute('href')),
+    mailto: Array.from(document.querySelectorAll('a[href^="mailto:"]')).map(a => a.getAttribute('href')),
+    expectedNumbers: SUPPORT_CONTACT.whatsapp
+  };
+});
+
+ok('the shell is gone, not merely covered', lockState.sidebars === 0, String(lockState.sidebars));
+ok('it is not headed "Activate your software", which implies a step they can take',
+  lockState.text.indexOf('Activate your software') === -1, lockState.text.slice(0, 120));
+ok('it says the licence is inactive, in the words the vendor chose',
+  lockState.text.indexOf('License inactive') > -1);
+ok('it names Digital Target', lockState.text.indexOf('Digital Target') > -1);
+ok('it shows the support number', lockState.text.indexOf('+92 345 1873354') > -1);
+ok('it reassures that the data is safe, which is the first thing anyone fears',
+  /still on this computer|not affected/i.test(lockState.text), lockState.text.slice(0, 200));
+ok('both WhatsApp numbers are tappable links', lockState.waLinks.length === 2, lockState.waLinks.join(' '));
+ok('the links carry the numbers in international form',
+  lockState.waLinks.every(l => /wa\.me\/92\d{9,}/.test(l)), lockState.waLinks.join(' '));
+ok('the email is a mailto link', lockState.mailto.length === 1 && /digitaltarget/.test(lockState.mailto[0]));
+// An empty key box here would read as "you typed it wrong", which is the one
+// thing that did not happen: the key is fine, the vendor stopped it.
+ok('no empty key box is pushed at someone whose key is not the problem',
+  (await page.locator('input[name="licenceKey"]').count()) === 0);
+ok('instead it offers to look again once the vendor has acted',
+  lockState.text.indexOf('no need to type the key again') > -1, lockState.text.slice(0, 260));
+ok('and a different key is still reachable for the rare case that needs one',
+  (await page.locator('button', { hasText: 'Enter a different key' }).count()) === 1);
+
+await page.locator('button', { hasText: 'Enter a different key' }).click();
+await page.waitForSelector('input[name="licenceKey"]', { timeout: 4000 }).catch(() => {});
+ok('choosing that reveals the key box',
+  (await page.locator('input[name="licenceKey"]').count()) === 1,
+  'inputs: ' + (await page.locator('input').count()));
+
+// The bug this suite exists for. The lock is drawn over a live app; anything
+// that refreshes — a toast timer, a background save, a stray click — used to
+// paint the sidebar straight back over it and hand the software to someone
+// whose licence had just been stopped.
+const afterRefresh = await page.evaluate(() => {
+  window.__hms.app.refresh();
+  window.__hms.app.render();
+  window.__hms.app.go('units');
+  return {
+    sidebars: document.querySelectorAll('.sidebar').length,
+    stillLocked: document.body.innerText.indexOf('License inactive') > -1
+  };
+});
+ok('refreshing the app cannot paint over the lock', afterRefresh.sidebars === 0, String(afterRefresh.sidebars));
+ok('rendering cannot either, and navigation is refused', afterRefresh.stillLocked);
+
+suite('A revoked licence locks it the same way');
+const revokedText = await page.evaluate(async () => {
+  const { activationGate } = await import('/src/ui/screens/activation.js');
+  const { supportLine } = await import('/src/core/licence-model.js');
+  activationGate(document.querySelector('#root'), {
+    ok: false, licensed: false, status: 'revoked',
+    message: 'License inactive. Please contact ' + supportLine(), details: null
+  }, () => {});
+  return document.body.innerText;
+});
+ok('a revoked licence also says inactive', revokedText.indexOf('License inactive') > -1);
+ok('...and gives the same number', revokedText.indexOf('1873354') > -1);
+ok('...and is labelled Inactive rather than a code', revokedText.indexOf('INACTIVE') > -1, revokedText.slice(0, 160));
+
+suite('An expired licence points at the vendor too');
+const expiredText = await page.evaluate(async () => {
+  const { activationGate } = await import('/src/ui/screens/activation.js');
+  activationGate(document.querySelector('#root'), {
+    ok: false, licensed: false, status: 'expired',
+    message: 'This licence expired on 2020-01-01.', details: null
+  }, () => {});
+  return document.body.innerText;
+});
+ok('an expired licence shows the contact card as well', expiredText.indexOf('1873354') > -1);
+
+suite('Entering a key is still offered when that is the answer');
+const freshText = await page.evaluate(async () => {
+  const { activationGate } = await import('/src/ui/screens/activation.js');
+  activationGate(document.querySelector('#root'), {
+    ok: false, licensed: false, status: 'none',
+    message: 'Enter the licence key supplied with your purchase.', details: null
+  }, () => {});
+  return { text: document.body.innerText, keyBox: !!document.querySelector('input[name="licenceKey"]') };
+});
+ok('a never-activated copy still gets the key box', freshText.keyBox);
+ok('...and is told the internet is needed once',
+  freshText.text.indexOf('Internet is needed once') > -1);
+ok('...and is not shown a support card it does not need yet',
+  freshText.text.indexOf('1873354') === -1, freshText.text.slice(0, 200));
+
+// Put the app back so nothing after this is testing a locked screen.
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(1200);
+await page.fill('[name="username"]', 'admin');
+await page.fill('#password', TEST_PASSWORD);
+await page.click('#signin');
+await page.waitForTimeout(1200);
+await clearToasts();
+
 suite('Console health');
 ok('no uncaught page errors during the whole run', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
 

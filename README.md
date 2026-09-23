@@ -170,7 +170,7 @@ is not a secret.
 ```bash
 npm test                                  # 765 checks, no browser needed
 npx http-server -p 8765 -s . &            # then, for the browser suites:
-node tests/browser.test.mjs               # 133 checks in real Chromium
+node tests/browser.test.mjs               # 155 checks in real Chromium
 npm run test:panel                        # 104 checks, serves itself
 ```
 

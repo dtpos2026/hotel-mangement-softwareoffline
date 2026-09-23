@@ -133,8 +133,10 @@ function watchLicence(app) {
       return;
     }
 
-    const root = qs('#root');
-    activationGate(root, status, () => window.location.reload());
+    // Lock the shell before drawing over it: an app that is still willing to
+    // render will paint itself back over the lock at the next toast or timer.
+    app.lock();
+    activationGate(qs('#root'), status, () => window.location.reload());
   });
 }
 
