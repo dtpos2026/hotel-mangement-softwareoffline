@@ -33,6 +33,15 @@ const toastText = () => page.evaluate(() =>
   Array.from(document.querySelectorAll('.toast')).map(t => t.innerText).join('\n'));
 const clearToasts = () => page.evaluate(() =>
   document.querySelectorAll('.toast').forEach(t => t.remove()));
+const closeAnyModal = async () => {
+  await page.evaluate(() => {
+    const m = window.__hms && window.__hms.feedback && window.__hms.feedback.closeAllModals;
+    if (m) m();
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.style.overflow = '';
+  });
+  await page.waitForTimeout(200);
+};
 const go = async (screen) => { await page.evaluate(s => window.__hms.app.go(s), screen); await page.waitForTimeout(350); };
 
 /* ------------------------------------------------------------------- boot */
@@ -234,14 +243,26 @@ await clearToasts();
 /* ------------------------------------------------------------ check-out */
 
 suite('Check-out with a balance');
+
+// Leave no modal behind: the preview above is closed by its own button, but a
+// stray one would swallow the clicks below and report a baffling title.
+await closeAnyModal();
 await go('checkout');
 await page.waitForTimeout(400);
 
-// Pick the stay that owes money.
-const target = await page.evaluate(() => {
+// Pick a stay that genuinely owes money. Taking the first one instead looked
+// equivalent and was not: the sample data is seeded relative to today, so on
+// some dates the first stay is paid ahead and there is no balance to warn
+// about at all.
+const target = await page.evaluate(async () => {
   const s = window.__hms.store;
-  return s.db.all('reservations').find(r => r.status === 'checked_in' && r.code.indexOf('RES') === 0).id;
+  const { billFor } = await import('/src/domain/folio.js');
+  const owing = s.db.all('reservations')
+    .filter(r => r.status === 'checked_in')
+    .find(r => billFor(s, r).balance > 0);
+  return owing ? owing.id : null;
 });
+ok('a checked-in stay with money outstanding exists to check out', target !== null);
 await page.evaluate(id => window.__hms.app.go('checkout', { reservationId: id }), target);
 await page.waitForTimeout(600);
 

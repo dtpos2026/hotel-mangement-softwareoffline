@@ -401,3 +401,36 @@ textarea.input { resize: vertical; }
   background: var(--surface-sunk); border: 1px solid var(--line);
   border-radius: 3px; padding: 1px 4px;
 }
+
+/* Setup help, shown when Firestore refuses an account that is signed in but
+   not on the admins list. It replaces the licence table, because nothing on
+   that table can work until this is done. */
+.setup {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--warn);
+  border-radius: var(--r-lg);
+  padding: 18px 20px;
+  max-width: 640px;
+  margin-bottom: 16px;
+}
+.setup__title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
+.setup__lead { font-size: 13px; color: var(--due); margin-bottom: 12px; }
+.setup__steps { margin: 0 0 12px; padding-inline-start: 20px; font-size: 13.5px; line-height: 1.8; }
+.setup__steps code {
+  font-family: var(--font-mono); font-size: 12px;
+  background: var(--surface-sunk); border: 1px solid var(--line);
+  border-radius: 3px; padding: 1px 5px;
+}
+.setup__steps a { color: var(--accent); }
+.setup__value {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--accent-tint); border: 1px solid #E0D2EF;
+  border-radius: var(--r); padding: 10px 12px; margin-bottom: 10px;
+}
+.setup__email {
+  font-family: var(--font-mono); font-size: 14px; font-weight: 700;
+  color: var(--accent); user-select: all; word-break: break-all;
+}
+.setup__note { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+.setup__acts { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -58,11 +58,16 @@ firebase login
 ### 1. Turn on the two sign-in methods
 
 In the [Firebase console](https://console.firebase.google.com/) → your project →
-**Authentication** → *Sign-in method*, enable:
+**Authentication** → *Sign-in method*, enable **both**:
 
 - **Email/Password** — how you sign into the panel.
 - **Anonymous** — how an installed copy of the software reads its own licence
   without you handing out any credentials.
+
+Miss the second one and activation fails on every customer's PC with
+`ADMIN_ONLY_OPERATION`, which is Firebase's way of saying "nobody may create an
+account here". The software now explains that in plain words on the activation
+screen, but the fix is this setting.
 
 ### 2. Create your panel account
 
@@ -192,6 +197,10 @@ deploy again. (An earlier version sat on "Loading…" for ever in this case,
 because a catch-all hosting rewrite turned the missing file into a 200 that
 served HTML where JavaScript was expected. Both the rewrite and the missing
 files are fixed.)
+
+**Activation says Anonymous sign-in is switched off** — step 1 above. Enable
+**Anonymous** under Authentication → Sign-in method. Nothing needs rebuilding or
+reinstalling; the next Activate press works.
 
 **"This account is not on the admins list"** — step 3 above. The document ID
 must be the email address exactly, including case.

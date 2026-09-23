@@ -38,9 +38,12 @@ export class Panel {
       try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text }; }
       if (!res.ok) {
         const raw = (body && body.error && body.error.message) || ('HTTP ' + res.status);
-        const err = new Error(friendly(raw, label));
+        const err = new Error(friendly(raw, label, res.status, this.email));
         err.status = res.status;
         err.raw = raw;
+        // Firestore refuses an account that is not on the admins list. The
+        // panel shows setup help for this rather than a bare message.
+        err.notAdmin = res.status === 403 || /PERMISSION_DENIED/i.test(raw);
         throw err;
       }
       return body;
@@ -211,7 +214,7 @@ function offlineError() {
 }
 
 /** Firebase speaks in shouted constants; people do not. */
-function friendly(raw, label) {
+function friendly(raw, label, status, email) {
   const map = {
     EMAIL_NOT_FOUND: 'No panel account uses that email address.',
     INVALID_PASSWORD: 'That password is not right.',
@@ -226,8 +229,14 @@ function friendly(raw, label) {
   };
   const code = String(raw).split(' : ')[0].trim();
   if (map[code]) return map[code];
-  if (/PERMISSION_DENIED|Missing or insufficient permissions/i.test(raw)) {
-    return 'Firestore refused that. This account is not on the admins list — add it in the Firebase console under the "admins" collection.';
+
+  // A Firestore 403 often arrives with an empty body, so the status has to be
+  // trusted as well as the text — otherwise this surfaced as "HTTP 403",
+  // which tells nobody anything.
+  if (status === 403 || /PERMISSION_DENIED|Missing or insufficient permissions/i.test(raw)) {
+    return email
+      ? `Firestore refused that: ${email} is not on the admins list yet.`
+      : 'Firestore refused that. This account is not on the admins list.';
   }
   if (/NOT_FOUND/i.test(raw) && label === 'listing') {
     return 'No licences have been created yet.';

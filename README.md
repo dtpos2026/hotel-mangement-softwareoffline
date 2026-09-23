@@ -162,10 +162,10 @@ is not a secret.
 ## Tests
 
 ```bash
-npm test                                  # 732 checks, no browser needed
+npm test                                  # 740 checks, no browser needed
 npx http-server -p 8765 -s . &            # then, for the browser suites:
-node tests/browser.test.mjs               # 132 checks in real Chromium
-npm run test:panel                        # 71 checks, serves itself
+node tests/browser.test.mjs               # 133 checks in real Chromium
+npm run test:panel                        # 81 checks, serves itself
 ```
 
 - `tests/run.js` — the 29-point acceptance checklist against the domain layer.

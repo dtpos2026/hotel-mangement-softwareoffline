@@ -21,7 +21,8 @@ const state = {
   search: '',
   filter: 'all',
   selected: null,
-  error: ''
+  error: '',
+  notAdmin: false
 };
 
 const root = document.getElementById('root');
@@ -167,6 +168,7 @@ async function loadLicences() {
     state.licences = await panel.listLicences(500);
   } catch (err) {
     state.error = err.message;
+    state.notAdmin = !!err.notAdmin;
     state.licences = [];
   } finally {
     state.loading = false;
@@ -177,16 +179,62 @@ function panelScreen() {
   return h('div.shell', [
     topbar(),
     h('main.main', [
-      state.error ? h('div.banner.banner--bad', [
+      state.error ? (state.notAdmin ? adminSetupHelp() : h('div.banner.banner--bad', [
         h('span', { text: state.error }),
         h('button.btn.btn--sm', { type: 'button', text: 'Try again',
           onclick: async () => { await loadLicences(); render(); } })
-      ]) : null,
+      ])) : null,
       statsRow(),
       toolbar(),
       state.loading ? h('div.empty', { text: 'Loading licences…' }) : licenceTable()
     ]),
     state.selected ? detailDrawer(state.selected) : null
+  ]);
+}
+
+/**
+ * Being signed in is not the same as being allowed in: the account also has
+ * to be listed in the admins collection. The rules cannot let the panel read
+ * that list to check in advance, so the refusal is the only signal there is —
+ * which makes it worth spending the space to say exactly what to do about it.
+ */
+function adminSetupHelp() {
+  const email = panel.email;
+  const consoleUrl = 'https://console.firebase.google.com/project/' +
+    encodeURIComponent(config.projectId) + '/firestore/data';
+
+  return h('div.setup', [
+    h('h2.setup__title', { text: 'One step left before this account can issue licences' }),
+    h('p.setup__lead', { text: state.error }),
+
+    h('ol.setup__steps', [
+      h('li', [
+        'Open ',
+        h('a', { href: consoleUrl, target: '_blank', rel: 'noopener', text: 'Firestore in the Firebase console' }),
+        '.'
+      ]),
+      h('li', ['Create a collection called ', h('code', { text: 'admins' }), ' if it is not there yet.']),
+      h('li', [
+        'Add a document whose ',
+        h('strong', { text: 'Document ID' }),
+        ' is exactly this email address:'
+      ]),
+      h('li', ['It needs no fields. Save it, then press ', h('strong', { text: 'Try again' }), ' below.'])
+    ]),
+
+    h('div.setup__value', [
+      h('code.setup__email', { text: email }),
+      h('button.btn.btn--sm', { type: 'button', text: 'Copy', onclick: () => copy(email, 'Email address') })
+    ]),
+
+    h('p.setup__note', { text: 'The document ID must match the address character for character, including the dots before the @.' }),
+
+    h('div.setup__acts', [
+      h('button.btn.btn--primary', { type: 'button', text: 'Try again',
+        onclick: async () => { await loadLicences(); render(); } }),
+      h('button.btn', { type: 'button', text: 'Sign in as someone else',
+        onclick: () => { panel.signOut(); state.licences = []; state.error = ''; state.notAdmin = false; go('signin'); } })
+    ])
   ]);
 }
 

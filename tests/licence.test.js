@@ -172,4 +172,53 @@ eq('a boolean stays a boolean', fromFirestore(toFirestore({ b: false })).b, fals
 eq('an empty array survives', fromFirestore(toFirestore({ a: [] })).a, []);
 eq('null survives', fromFirestore(toFirestore({ v: null })).v, null);
 
+suite('Firebase errors say what to do about them');
+
+// These reach the activation screen, where "ADMIN_ONLY_OPERATION" means
+// nothing to a hotel owner. Each one is a setting somebody has to go and
+// change, so the message has to name it.
+const { FirebaseRest } = await import('../electron/firebase-rest.cjs');
+
+async function errorFor(status, body) {
+  const real = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify(body), {
+    status, headers: { 'Content-Type': 'application/json' }
+  });
+  try {
+    const fb = new FirebaseRest({ apiKey: 'k', projectId: 'p' });
+    await fb.ensureToken();
+    return null;
+  } catch (err) {
+    return err;
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+
+const anonOff = await errorFor(400, { error: { message: 'ADMIN_ONLY_OPERATION' } });
+ok('anonymous sign-in being switched off is explained, not echoed',
+  anonOff && anonOff.message.indexOf('ADMIN_ONLY_OPERATION') === -1, anonOff && anonOff.message);
+ok('...it names Anonymous sign-in as the thing to enable',
+  anonOff && /Anonymous/.test(anonOff.message));
+ok('...it names where to do it',
+  anonOff && /Authentication/.test(anonOff.message) && /Sign-in method/.test(anonOff.message));
+ok('...and the raw code is kept for support',
+  anonOff && anonOff.raw === 'ADMIN_ONLY_OPERATION');
+
+const notAllowed = await errorFor(400, { error: { message: 'OPERATION_NOT_ALLOWED' } });
+ok('a disallowed sign-in method is explained too',
+  notAllowed && /Anonymous/.test(notAllowed.message), notAllowed && notAllowed.message);
+
+const badKey = await errorFor(400, { error: { message: 'API key not valid. Please pass a valid API key.' } });
+ok('an invalid API key tells the customer to contact their supplier',
+  badKey && /supplier/.test(badKey.message), badKey && badKey.message);
+
+const denied = await errorFor(403, { error: { message: 'PERMISSION_DENIED' } });
+ok('a refused request points at the security rules',
+  denied && /rules/.test(denied.message), denied && denied.message);
+
+const unknown = await errorFor(500, { error: { message: 'Backend exploded' } });
+ok('anything unrecognised is still reported, with its label',
+  unknown && unknown.message.indexOf('Backend exploded') > -1, unknown && unknown.message);
+
 process.exit(report() === 0 ? 0 : 1);

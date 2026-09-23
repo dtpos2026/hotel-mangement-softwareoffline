@@ -35,10 +35,11 @@ class FirebaseRest {
       let body = null;
       try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text }; }
       if (!res.ok) {
-        const message = (body && body.error && body.error.message) || `HTTP ${res.status}`;
-        const err = new Error(`${label} failed: ${message}`);
+        const raw = (body && body.error && body.error.message) || `HTTP ${res.status}`;
+        const err = new Error(explain(raw, label, res.status));
         err.status = res.status;
         err.firebaseCode = body && body.error && body.error.status;
+        err.raw = raw;
         throw err;
       }
       return body;
@@ -102,6 +103,44 @@ class FirebaseRest {
       }, 'Update');
     return fromFirestore(body.fields || {});
   }
+}
+
+/* ------------------------------------------------------------ messages */
+
+/**
+ * Turns a Firebase error into something a hotel owner can act on.
+ *
+ * These reach the activation screen, so "ADMIN_ONLY_OPERATION" is not good
+ * enough: it is what Identity Toolkit returns when Anonymous sign-in is
+ * switched off in the project, which is a setting somebody has to go and
+ * turn on. Saying so is the difference between a five-minute fix and a
+ * support call.
+ */
+function explain(raw, label, status) {
+  const code = String(raw).split(' : ')[0].trim();
+
+  if (code === 'ADMIN_ONLY_OPERATION' || /ADMIN_ONLY_OPERATION/.test(raw)) {
+    return 'The licence server is not finished being set up: Anonymous sign-in is switched off for this Firebase project. ' +
+           'In the Firebase console open Authentication, then Sign-in method, and enable Anonymous. ' +
+           'Activation will work straight away after that.';
+  }
+  if (code === 'OPERATION_NOT_ALLOWED' || /OPERATION_NOT_ALLOWED/.test(raw)) {
+    return 'The licence server refused the sign-in method it uses. In the Firebase console, under Authentication then Sign-in method, enable Anonymous.';
+  }
+  if (code === 'API_KEY_INVALID' || /API key not valid/i.test(raw)) {
+    return 'This copy was built with licence server details that are no longer valid. Contact your supplier.';
+  }
+  if (code === 'TOO_MANY_ATTEMPTS_TRY_LATER') {
+    return 'The licence server is busy. Wait a few minutes and try to activate again.';
+  }
+  if (status === 403 || /PERMISSION_DENIED/i.test(raw)) {
+    return 'The licence server refused the request. Its security rules may not be published yet — contact your supplier.';
+  }
+  if (status === 404 && label === 'Lookup') {
+    // A missing document is a missing licence, handled by the caller.
+    return raw;
+  }
+  return `${label} failed: ${raw}`;
 }
 
 /* ------------------------------------------------- value conversion */

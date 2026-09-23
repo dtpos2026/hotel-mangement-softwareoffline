@@ -47,6 +47,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 /* ------------------------------------------------------- the Firebase stub */
 
 const ADMIN_EMAIL = 'owner@gmail.com';
+const config_projectId = 'dt-hotel-mangemnet';
 const ADMIN_PASSWORD = 'panel-pass-1';
 /** docId -> plain record. The stub converts to wire format on the way out. */
 const docs = new Map();
@@ -432,6 +433,50 @@ for (const f of libFiles) {
     res.ok && /javascript/.test(res.headers.get('content-type') || ''),
     res.status + ' ' + res.headers.get('content-type'));
 }
+
+suite('An account that is signed in but not an admin');
+
+// Exactly what a real project does before the admins collection exists: the
+// listing comes back 403, and with an empty body, which is why this once
+// surfaced as the useless banner "HTTP 403".
+let denyListing = true;
+// A predicate rather than a glob: ":runQuery" is a path suffix, not a segment,
+// and glob matching does not reliably pick it out.
+await page.route(url => String(url).includes(':runQuery'), route => {
+  if (!denyListing) return stub(route);
+  return route.fulfill({ status: 403, contentType: 'application/json', body: '{}' });
+});
+
+// The previous suite signed out, so sign back in before testing the refusal.
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(500);
+await page.fill('input[type=email]', ADMIN_EMAIL);
+await page.fill('input[type=password]', ADMIN_PASSWORD);
+await page.click('button[type=submit]');
+await page.waitForTimeout(1400);
+const denied = await text();
+
+ok('the panel no longer shows a bare "HTTP 403"', denied.indexOf('HTTP 403') === -1, denied.slice(0, 160));
+ok('it says the account is not on the admins list', denied.indexOf('not on the admins list') > -1);
+ok('it names the exact account that was refused', denied.indexOf(ADMIN_EMAIL) > -1);
+ok('it says which collection to add it to', denied.indexOf('admins') > -1);
+ok('it says the email is the document ID', denied.toLowerCase().indexOf('document id') > -1);
+ok('it links to this project\'s Firestore console',
+  (await page.locator('.setup a').getAttribute('href') || '').indexOf(config_projectId) > -1);
+ok('the email can be copied rather than retyped',
+  await page.locator('.setup__value button', { hasText: 'Copy' }).count() === 1);
+ok('the licence table is not shown, because none of it can work yet',
+  await page.locator('.table').count() === 0);
+
+// And once the document exists, Try again gets straight in.
+denyListing = false;
+await page.locator('.setup button', { hasText: 'Try again' }).click();
+await page.waitForTimeout(900);
+ok('adding the admin document and pressing Try again gets in',
+  await page.locator('.table').count() === 1);
+ok('the setup help is gone', await page.locator('.setup').count() === 0);
+
+await page.unroute(url => String(url).includes(':runQuery'));
 
 suite('Page health');
 ok('no script errors anywhere in that run', errs.length === 0, errs.join(' | '));
